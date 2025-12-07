@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="home_list_spacing">16dp</dimen>
+    <dimen name="home_grid_spacing">8dp</dimen>
+    <dimen name="fast_scroll_track_width">2dp</dimen>
+    <dimen name="fast_scroll_thumb_width">22dp</dimen>
+    <dimen name="fast_scroll_thumb_height">36dp</dimen>
+    <dimen name="fast_scroll_bubble_padding_horizontal">18dp</dimen>
+    <dimen name="fast_scroll_bubble_padding_vertical">10dp</dimen>
+    <dimen name="fast_scroll_bubble_spacing">28dp</dimen>
+</resources>

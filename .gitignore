@@ -1,0 +1,42 @@
+# 忽略整个 .idea 目录（包含所有子文件/文件夹）
+.idea/
+# 忽略所有 .iml 文件
+*.iml
+# 构建目录
+build/
+.externalNativeBuild/
+.cxx/
+
+# 旧git
+/.git_old/
+
+# 本地属性  本地环境配置（如 SDK 路径）
+/local.properties
+
+# Gradle 缓存和日志
+.gradle/
+# 通常不需要提交 wrapper
+gradle-wrapper.jar
+
+# clip
+/ml-mobileclip/
+/Chinese-CLIP/
+
+# 翻译模型
+/opus-mt-zh-en/
+
+/Versta.Models/
+/Versta.Android/
+
+# dinov3
+/dinov3/
+
+/photos/
+
+/images/
+
+# 捕获的屏幕截图  屏幕截图目录
+/captures/
+
+# 临时文件和系统文件
+.DS_Store

@@ -1,0 +1,871 @@
+package com.example.photos.ui.albums;
+
+import android.app.PendingIntent;
+import android.app.RecoverableSecurityException;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.database.Cursor;
+import android.provider.MediaStore;
+import android.provider.Settings;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.exifinterface.media.ExifInterface;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
+
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.RequestOptions;
+import com.example.photos.R;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.io.File;
+import java.io.InputStream;
+
+public class AlbumViewerActivity extends AppCompatActivity {
+
+    public static final String EXTRA_URLS = "extra_urls";
+    public static final String EXTRA_IDS = "extra_ids";
+    public static final String EXTRA_START_INDEX = "extra_start_index";
+    public static final String EXTRA_DELETED_IDS = "extra_deleted_ids";
+    public static final String EXTRA_DATES = "extra_dates";
+
+    private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
+            .fitCenter()
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .dontAnimate()
+            .dontTransform();
+
+    private final List<PhotoEntry> entries = new ArrayList<>();
+    private final ArrayList<String> deletedIds = new ArrayList<>();
+    private boolean chromeVisible = true;
+    private TextView counterTextView;
+    private TextView titleTextView;
+    private ViewPager2 pager;
+    private AlbumPagerAdapter adapter;
+    private ThumbnailAdapter thumbAdapter;
+    private View topBar;
+    private View bottomPanel;
+    private int topBasePaddingTop;
+    private int bottomBasePaddingBottom;
+    private int lightBarColor = Color.WHITE;
+    private int darkBarColor = Color.BLACK;
+    private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
+    private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
+    private PhotoEntry pendingDeleteEntry;
+    private int pendingDeletePosition = RecyclerView.NO_POSITION;
+    private PhotoEntry pendingManageEntry;
+    private int pendingManagePosition = RecyclerView.NO_POSITION;
+    private Uri pendingManageUri;
+    private final java.util.concurrent.ExecutorService dbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_album_viewer);
+        pager = findViewById(R.id.albumViewPager);
+        counterTextView = findViewById(R.id.albumViewerCounterTextView);
+        titleTextView = findViewById(R.id.albumViewerTitleTextView);
+        topBar = findViewById(R.id.albumViewerTopBar);
+        bottomPanel = findViewById(R.id.albumViewerBottomPanel);
+        topBasePaddingTop = topBar.getPaddingTop();
+        bottomBasePaddingBottom = bottomPanel.getPaddingBottom();
+        ImageButton backButton = findViewById(R.id.albumViewerBackButton);
+        ImageButton shareButton = findViewById(R.id.albumViewerShareButton);
+        ImageButton deleteButton = findViewById(R.id.albumViewerDeleteButton);
+        ImageButton moreButton = findViewById(R.id.albumViewerMoreButton);
+        ImageButton infoButton = findViewById(R.id.albumViewerInfoButton);
+        RecyclerView thumbRecyclerView = findViewById(R.id.albumViewerThumbRecyclerView);
+        View root = findViewById(R.id.albumViewerRoot);
+        // Ensure status/navigation icons use dark mode on light background initially
+        updateSystemBars(true, root);
+        applyWindowInsets(root);
+        deletePermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartIntentSenderForResult(),
+                result -> {
+                    if (pendingDeleteEntry == null || pendingDeletePosition == RecyclerView.NO_POSITION) {
+                        clearPendingDelete();
+                        return;
+                    }
+                    if (result.getResultCode() == RESULT_OK) {
+                        onDeleteSuccess(pendingDeletePosition, pendingDeleteEntry.id);
+                    } else {
+                        Toast.makeText(this, R.string.delete_failed, Toast.LENGTH_SHORT).show();
+                    }
+                    clearPendingDelete();
+                });
+        manageMediaPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (hasManageMediaPermission()) {
+                        if (pendingManageEntry != null && pendingManageUri != null && pendingManagePosition != RecyclerView.NO_POSITION) {
+                            performDeleteWithPermission(pendingManageEntry, pendingManageUri, pendingManagePosition);
+                        }
+                    } else {
+                        Toast.makeText(this, R.string.manage_media_permission_needed, Toast.LENGTH_SHORT).show();
+                    }
+                    clearPendingManage();
+                });
+
+        backButton.setOnClickListener(v -> finishWithResult());
+        shareButton.setOnClickListener(v -> shareCurrent());
+        deleteButton.setOnClickListener(v -> deleteCurrent());
+        moreButton.setOnClickListener(v -> Toast.makeText(this, R.string.more, Toast.LENGTH_SHORT).show());
+        infoButton.setOnClickListener(v -> showInfoForCurrent());
+
+        ArrayList<String> urls = getIntent().getStringArrayListExtra(EXTRA_URLS);
+        ArrayList<String> ids = getIntent().getStringArrayListExtra(EXTRA_IDS);
+        ArrayList<String> dates = getIntent().getStringArrayListExtra(EXTRA_DATES);
+        int start = getIntent().getIntExtra(EXTRA_START_INDEX, 0);
+        if (urls != null) {
+            for (int i = 0; i < urls.size(); i++) {
+                String url = urls.get(i);
+                String id = (ids != null && i < ids.size()) ? ids.get(i) : null;
+                String date = (dates != null && i < dates.size()) ? dates.get(i) : null;
+                entries.add(new PhotoEntry(id, url, date));
+            }
+        }
+        adapter = new AlbumPagerAdapter(entries, this::toggleChrome);
+        pager.setAdapter(adapter);
+        pager.setOffscreenPageLimit(1);
+        pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                updateCounter();
+            }
+        });
+        pager.setCurrentItem(Math.max(0, Math.min(start, entries.size() - 1)), false);
+        updateCounter();
+        thumbAdapter = new ThumbnailAdapter(entries, this::scrollToPosition);
+        thumbRecyclerView.setAdapter(thumbAdapter);
+        updateThumbSelection();
+        pager.setOnClickListener(v -> toggleChrome());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        chromeVisible = true;
+        if (topBar != null) topBar.setVisibility(View.VISIBLE);
+        if (bottomPanel != null) bottomPanel.setVisibility(View.VISIBLE);
+        updateSystemBars(true, findViewById(R.id.albumViewerRoot));
+    }
+
+    @Override
+    public void onBackPressed() {
+        finishWithResult();
+    }
+
+    private void updateCounter() {
+        if (counterTextView == null) return;
+        int pos = pager == null ? 0 : pager.getCurrentItem();
+        PhotoEntry entry = (pos >= 0 && pos < entries.size()) ? entries.get(pos) : null;
+        String date = entry == null ? "" : entry.date;
+        if (titleTextView != null) {
+            titleTextView.setText(formatDate(date));
+        }
+        if (counterTextView != null) {
+            counterTextView.setVisibility(View.GONE);
+        }
+        updateThumbSelection();
+    }
+
+    private void toggleChrome() {
+        if (topBar == null || bottomPanel == null) return;
+        chromeVisible = !chromeVisible;
+        int newVisibility = chromeVisible ? View.VISIBLE : View.GONE;
+        topBar.setVisibility(newVisibility);
+        bottomPanel.setVisibility(newVisibility);
+        updateSystemBars(chromeVisible, findViewById(R.id.albumViewerRoot));
+    }
+
+    private void showInfoForCurrent() {
+        int position = pager == null ? -1 : pager.getCurrentItem();
+        if (position < 0 || position >= entries.size()) return;
+        PhotoEntry entry = entries.get(position);
+        if (entry == null || entry.url == null) return;
+        MediaInfo info = loadMediaInfo(entry);
+
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_photo_info, null, false);
+        TextView nameView = dialogView.findViewById(R.id.infoName);
+        TextView dateView = dialogView.findViewById(R.id.infoDate);
+        TextView sizeView = dialogView.findViewById(R.id.infoSize);
+        TextView cameraView = dialogView.findViewById(R.id.infoCamera);
+        TextView focalView = dialogView.findViewById(R.id.infoFocal);
+        TextView apertureView = dialogView.findViewById(R.id.infoAperture);
+        TextView shutterView = dialogView.findViewById(R.id.infoShutter);
+        TextView isoView = dialogView.findViewById(R.id.infoIso);
+        TextView evView = dialogView.findViewById(R.id.infoEv);
+        TextView pathView = dialogView.findViewById(R.id.infoPath);
+        TextView locationView = dialogView.findViewById(R.id.infoLocation);
+        View exposureCard = dialogView.findViewById(R.id.infoExposureCard);
+
+        if (nameView != null) nameView.setText(nonNull(info.displayName, getString(R.string.app_name)));
+        if (dateView != null) dateView.setText(info.displayDate());
+        if (sizeView != null) sizeView.setText(info.sizeAndResolution());
+        if (cameraView != null) cameraView.setText(info.cameraText());
+        if (focalView != null) focalView.setText(info.focalLengthText());
+        if (apertureView != null) apertureView.setText(info.apertureText());
+        if (shutterView != null) shutterView.setText(info.shutterText());
+        if (isoView != null) isoView.setText(info.isoText());
+        if (evView != null) evView.setText(info.evText());
+        if (pathView != null) pathView.setText(nonNull(info.path, entry.url));
+        if (locationView != null) locationView.setText(info.locationText());
+        if (exposureCard != null) {
+            exposureCard.setVisibility(info.hasExposureInfo() ? View.VISIBLE : View.GONE);
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.show();
+    }
+
+    private MediaInfo loadMediaInfo(@NonNull PhotoEntry entry) {
+        MediaInfo info = new MediaInfo();
+        Uri uri = Uri.parse(entry.url);
+        info.path = uri.getPath();
+        info.displayName = lastSegment(uri);
+        info.dateText = entry.date;
+        try (Cursor c = getContentResolver().query(uri,
+                new String[]{MediaStore.MediaColumns.DISPLAY_NAME,
+                        MediaStore.MediaColumns.SIZE,
+                        MediaStore.MediaColumns.WIDTH,
+                        MediaStore.MediaColumns.HEIGHT,
+                        MediaStore.MediaColumns.DATE_MODIFIED},
+                null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int idxName = c.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+                int idxSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE);
+                int idxW = c.getColumnIndex(MediaStore.MediaColumns.WIDTH);
+                int idxH = c.getColumnIndex(MediaStore.MediaColumns.HEIGHT);
+                int idxDate = c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
+                if (idxName >= 0 && !c.isNull(idxName)) info.displayName = c.getString(idxName);
+                if (idxSize >= 0 && !c.isNull(idxSize)) info.sizeBytes = c.getLong(idxSize);
+                if (idxW >= 0 && !c.isNull(idxW)) info.width = c.getInt(idxW);
+                if (idxH >= 0 && !c.isNull(idxH)) info.height = c.getInt(idxH);
+                if (idxDate >= 0 && !c.isNull(idxDate)) {
+                    long ts = c.getLong(idxDate) * 1000L;
+                    info.dateText = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(ts));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        if (info.path == null) {
+            info.path = entry.url;
+        }
+        readExif(info, uri);
+        return info;
+    }
+
+    private void readExif(@NonNull MediaInfo info, @NonNull Uri uri) {
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) return;
+            ExifInterface exif = new ExifInterface(inputStream);
+            info.cameraMake = exif.getAttribute(ExifInterface.TAG_MAKE);
+            info.cameraModel = exif.getAttribute(ExifInterface.TAG_MODEL);
+            info.lensModel = exif.getAttribute(ExifInterface.TAG_LENS_MODEL);
+            info.focalLengthMm = exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, Double.NaN);
+            info.aperture = exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, Double.NaN);
+            info.exposureTimeSeconds = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, Double.NaN);
+            info.iso = exif.getAttributeInt(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY, -1);
+            info.exposureBiasEv = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_BIAS_VALUE, Double.NaN);
+            String exifDate = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
+            if (exifDate == null || exifDate.isEmpty()) {
+                exifDate = exif.getAttribute(ExifInterface.TAG_DATETIME);
+            }
+            if (exifDate != null && !exifDate.isEmpty()) {
+                info.exifDateText = exifDate;
+            }
+            float[] latLong = new float[2];
+            if (exif.getLatLong(latLong)) {
+                info.latitude = latLong[0];
+                info.longitude = latLong[1];
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String lastSegment(Uri uri) {
+        if (uri == null) return null;
+        String seg = uri.getLastPathSegment();
+        if (seg != null) return seg;
+        String path = uri.getPath();
+        if (path == null) return null;
+        int idx = path.lastIndexOf('/');
+        return idx >= 0 && idx < path.length() - 1 ? path.substring(idx + 1) : path;
+    }
+
+    private String nonNull(String v, String fallback) {
+        return v == null || v.isEmpty() ? fallback : v;
+    }
+
+    private void updateSystemBars(boolean showChrome, View root) {
+        WindowInsetsControllerCompat controller = root == null ? null : ViewCompat.getWindowInsetsController(root);
+        if (showChrome) {
+            getWindow().setStatusBarColor(lightBarColor);
+            getWindow().setNavigationBarColor(lightBarColor);
+            if (controller != null) {
+                controller.show(WindowInsetsCompat.Type.systemBars());
+                controller.setAppearanceLightStatusBars(true);
+                controller.setAppearanceLightNavigationBars(true);
+            }
+        } else {
+            getWindow().setStatusBarColor(darkBarColor);
+            getWindow().setNavigationBarColor(darkBarColor);
+            if (controller != null) {
+                controller.hide(WindowInsetsCompat.Type.systemBars());
+                controller.setAppearanceLightStatusBars(false);
+                controller.setAppearanceLightNavigationBars(false);
+            }
+        }
+    }
+
+    private void shareCurrent() {
+        int position = pager == null ? -1 : pager.getCurrentItem();
+        if (position < 0 || position >= entries.size()) return;
+        PhotoEntry entry = entries.get(position);
+        if (entry == null || entry.url == null) return;
+        Uri uri = Uri.parse(entry.url);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(Intent.createChooser(intent, getString(R.string.share)));
+        } catch (Throwable t) {
+            Toast.makeText(this, R.string.share_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void deleteCurrent() {
+        int position = pager == null ? -1 : pager.getCurrentItem();
+        if (position < 0 || position >= entries.size()) return;
+        PhotoEntry entry = entries.get(position);
+        if (entry == null || entry.url == null) return;
+        Uri uri = Uri.parse(entry.url);
+        showDeleteConfirmDialog(entry, uri, position);
+    }
+
+    private void showDeleteConfirmDialog(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_delete_confirm, null, false);
+        TextView message = dialogView.findViewById(R.id.deleteConfirmMessage);
+        AppCompatButton positive = dialogView.findViewById(R.id.deleteConfirmPositive);
+        AppCompatButton negative = dialogView.findViewById(R.id.deleteConfirmNegative);
+        if (message != null) {
+            message.setText(R.string.delete_confirm_message);
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        if (positive != null) {
+            positive.setText(R.string.delete_confirm_positive);
+            positive.setOnClickListener(v -> {
+                dialog.dismiss();
+                performDelete(entry, uri, position);
+            });
+        }
+        if (negative != null) {
+            negative.setText(R.string.delete_confirm_negative);
+            negative.setOnClickListener(v -> dialog.dismiss());
+        }
+        dialog.show();
+    }
+
+    private void performDelete(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
+        if (needsManageMediaPermission(uri) && !hasManageMediaPermission()) {
+            requestManageMediaPermission(entry, uri, position);
+            return;
+        }
+        performDeleteWithPermission(entry, uri, position);
+    }
+
+    private void performDeleteWithPermission(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
+        try {
+            if (deleteViaContentResolver(uri)) {
+                onDeleteSuccess(position, entry.id);
+                return;
+            }
+        } catch (RecoverableSecurityException rse) {
+            if (launchDeletePermission(uri, entry, position)) return;
+        } catch (SecurityException se) {
+            if (launchDeletePermission(uri, entry, position)) return;
+        } catch (Throwable ignored) {
+            // fall through to file deletion
+        }
+        if (tryDeleteFile(entry.url)) {
+            onDeleteSuccess(position, entry.id);
+        } else {
+            Toast.makeText(this, R.string.delete_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void finishWithResult() {
+        Intent data = new Intent();
+        data.putStringArrayListExtra(EXTRA_DELETED_IDS, deletedIds);
+        setResult(RESULT_OK, data);
+        finish();
+    }
+
+    private void scrollToPosition(int position) {
+        if (pager == null || position < 0 || position >= entries.size()) return;
+        pager.setCurrentItem(position, false);
+        updateCounter();
+    }
+
+    private String formatDate(String raw) {
+        if (raw == null || raw.isEmpty()) return "";
+        if (raw.length() >= 10) {
+            return raw.substring(0, 10);
+        }
+        return raw;
+    }
+
+    private void applyWindowInsets(View root) {
+        if (root == null) return;
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            WindowInsetsCompat windowInsets = insets;
+            int top = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
+            int bottom = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+            if (topBar != null) {
+                topBar.setPadding(topBar.getPaddingLeft(), topBasePaddingTop + top,
+                        topBar.getPaddingRight(), topBar.getPaddingBottom());
+            }
+            if (bottomPanel != null) {
+                bottomPanel.setPadding(bottomPanel.getPaddingLeft(),
+                        bottomPanel.getPaddingTop(),
+                        bottomPanel.getPaddingRight(),
+                        bottomBasePaddingBottom + bottom);
+            }
+        return insets;
+    });
+}
+
+    private boolean deleteViaContentResolver(@NonNull Uri uri) {
+        int rows = getContentResolver().delete(uri, null, null);
+        return rows > 0;
+    }
+
+    private boolean hasManageMediaPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
+        return MediaStore.canManageMedia(this);
+    }
+
+    private boolean needsManageMediaPermission(@NonNull Uri uri) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
+        return "content".equalsIgnoreCase(uri.getScheme())
+                && (MediaStore.AUTHORITY.equals(uri.getAuthority()) || (uri.getAuthority() != null && uri.getAuthority().contains("media")));
+    }
+
+    private void requestManageMediaPermission(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
+        pendingManageEntry = entry;
+        pendingManagePosition = position;
+        pendingManageUri = uri;
+        try {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_MANAGE_MEDIA);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            manageMediaPermissionLauncher.launch(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.manage_media_permission_needed, Toast.LENGTH_SHORT).show();
+            clearPendingManage();
+        }
+    }
+
+    private boolean launchDeletePermission(@NonNull Uri uri, @NonNull PhotoEntry entry, int position) {
+        if (deletePermissionLauncher == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return false;
+        }
+        try {
+            pendingDeleteEntry = entry;
+            pendingDeletePosition = position;
+            PendingIntent pi = MediaStore.createDeleteRequest(getContentResolver(),
+                    Collections.singletonList(uri));
+            IntentSenderRequest request = new IntentSenderRequest.Builder(pi.getIntentSender()).build();
+            deletePermissionLauncher.launch(request);
+            return true;
+        } catch (Exception e) {
+            clearPendingDelete();
+            return false;
+        }
+    }
+
+    private boolean tryDeleteFile(String url) {
+        try {
+            if (url == null) return false;
+            Uri uri = Uri.parse(url);
+            if ("file".equalsIgnoreCase(uri.getScheme())) {
+                File f = new File(uri.getPath());
+                return f.exists() && f.delete();
+            }
+            File f = new File(url);
+            return f.exists() && f.delete();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void onDeleteSuccess(int position, String entryId) {
+        if (position < 0 || position >= entries.size()) {
+            clearPendingDelete();
+            updateCounter();
+            return;
+        }
+        if (entryId != null) {
+            deletedIds.add(entryId);
+        }
+        removeFromDbAsync(entryId, position >= 0 && position < entries.size() ? entries.get(position).url : null);
+        entries.remove(position);
+        adapter.notifyItemRemoved(position);
+        if (thumbAdapter != null) {
+            thumbAdapter.notifyItemRemoved(position);
+        }
+        if (entries.isEmpty()) {
+            finishWithResult();
+            return;
+        }
+        adapter.notifyItemRangeChanged(position, entries.size() - position);
+        if (thumbAdapter != null) {
+            thumbAdapter.notifyItemRangeChanged(position, entries.size() - position);
+            thumbAdapter.setSelected(Math.min(position, entries.size() - 1));
+        }
+        if (pager != null) {
+            int newPos = Math.min(position, entries.size() - 1);
+            pager.setCurrentItem(newPos, false);
+            pager.post(this::updateCounter);
+        } else {
+            updateCounter();
+        }
+        clearPendingDelete();
+    }
+
+    private void clearPendingManage() {
+        pendingManageEntry = null;
+        pendingManagePosition = RecyclerView.NO_POSITION;
+        pendingManageUri = null;
+    }
+
+    private void clearPendingDelete() {
+        pendingDeleteEntry = null;
+        pendingDeletePosition = RecyclerView.NO_POSITION;
+    }
+
+    private void removeFromDbAsync(String id, String uri) {
+        if (id == null && uri == null) return;
+        dbExecutor.execute(() -> {
+            try {
+                com.example.photos.db.PhotosDb db = com.example.photos.db.PhotosDb.get(getApplicationContext());
+                if (id != null) {
+                    try {
+                        long lid = Long.parseLong(id);
+                        db.photoDao().deleteById(lid);
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (uri != null) {
+                    db.categoryDao().deleteByMediaKey(uri);
+                    db.featureDao().deleteByMediaKey(uri);
+                }
+            } catch (Throwable ignored) {
+            }
+        });
+    }
+
+    private void updateThumbSelection() {
+        if (thumbAdapter == null || pager == null) return;
+        thumbAdapter.setSelected(pager.getCurrentItem());
+    }
+
+    private static class ThumbnailAdapter extends RecyclerView.Adapter<ThumbnailAdapter.ThumbViewHolder> {
+        private final List<PhotoEntry> items;
+        private int selected = 0;
+        private final java.util.function.IntConsumer onClick;
+
+        ThumbnailAdapter(List<PhotoEntry> items, java.util.function.IntConsumer onClick) {
+            this.items = items == null ? new ArrayList<>() : items;
+            this.onClick = onClick;
+        }
+
+        void setSelected(int index) {
+            int old = selected;
+            selected = index;
+            notifyItemChanged(old);
+            notifyItemChanged(selected);
+        }
+
+        @NonNull
+        @Override
+        public ThumbViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_album_viewer_thumb, parent, false);
+            return new ThumbViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ThumbViewHolder holder, int position) {
+            holder.bind(items.get(position), position == selected, () -> {
+                if (onClick != null) onClick.accept(position);
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        static class ThumbViewHolder extends RecyclerView.ViewHolder {
+            private final ImageView imageView;
+            private final View overlay;
+
+            ThumbViewHolder(@NonNull View itemView) {
+                super(itemView);
+                imageView = itemView.findViewById(R.id.thumbImageView);
+                overlay = itemView.findViewById(R.id.thumbOverlay);
+            }
+
+            void bind(PhotoEntry entry, boolean selected, Runnable onClick) {
+                overlay.setVisibility(selected ? View.VISIBLE : View.GONE);
+                Glide.with(imageView.getContext())
+                        .load(entry == null ? null : entry.url)
+                        .apply(VIEWER_OPTIONS)
+                        .placeholder(R.drawable.ic_photo_placeholder)
+                        .error(R.drawable.ic_photo_placeholder)
+                        .into(imageView);
+                itemView.setOnClickListener(v -> onClick.run());
+            }
+        }
+    }
+
+    private static class AlbumPagerAdapter extends RecyclerView.Adapter<AlbumPagerAdapter.ViewHolder> {
+
+        private final List<PhotoEntry> items;
+        private final Runnable onToggleChrome;
+
+        AlbumPagerAdapter(@NonNull List<PhotoEntry> items, Runnable onToggleChrome) {
+            this.items = items == null ? new ArrayList<>() : items;
+            this.onToggleChrome = onToggleChrome;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_album_viewer_photo, parent, false);
+            return new ViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            holder.bind(items.get(position));
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            private final ImageView imageView;
+
+            ViewHolder(@NonNull View itemView) {
+                super(itemView);
+                imageView = itemView.findViewById(R.id.albumViewerImageView);
+            }
+
+            void bind(PhotoEntry entry) {
+                if (entry == null) return;
+                Glide.with(imageView.getContext())
+                        .load(entry.url)
+                        .apply(VIEWER_OPTIONS)
+                        .placeholder(R.drawable.ic_photo_placeholder)
+                        .error(R.drawable.ic_photo_placeholder)
+                        .into(imageView);
+                itemView.setOnClickListener(v -> {
+                    if (onToggleChrome != null) onToggleChrome.run();
+                });
+            }
+        }
+    }
+
+    private static class PhotoEntry {
+        final String id;
+        final String url;
+        final String date;
+
+        PhotoEntry(String id, String url, String date) {
+            this.id = id;
+            this.url = url;
+            this.date = date;
+        }
+    }
+
+    private static class MediaInfo {
+        String displayName;
+        String path;
+        long sizeBytes = 0;
+        int width = 0;
+        int height = 0;
+        String dateText;
+        String exifDateText;
+        String cameraMake;
+        String cameraModel;
+        String lensModel;
+        double focalLengthMm = Double.NaN;
+        double aperture = Double.NaN;
+        double exposureTimeSeconds = Double.NaN;
+        int iso = -1;
+        double exposureBiasEv = Double.NaN;
+        float latitude = Float.NaN;
+        float longitude = Float.NaN;
+
+        String prettySize() {
+            if (sizeBytes <= 0) return "--";
+            double mb = sizeBytes / (1024.0 * 1024.0);
+            if (mb >= 1) return String.format(java.util.Locale.getDefault(), "%.2f MB", mb);
+            double kb = sizeBytes / 1024.0;
+            return String.format(java.util.Locale.getDefault(), "%.0f KB", kb);
+        }
+
+        String sizeAndResolution() {
+            String size = sizeBytes > 0 ? prettySize() : "";
+            String resolution = (width > 0 && height > 0) ? width + " × " + height : "";
+            if (!size.isEmpty() && !resolution.isEmpty()) return size + "  " + resolution;
+            if (!size.isEmpty()) return size;
+            if (!resolution.isEmpty()) return resolution;
+            return "--";
+        }
+
+        String displayDate() {
+            String exifDate = formatExifDate();
+            if (exifDate != null && !exifDate.isEmpty()) {
+                return exifDate;
+            }
+            return dateText == null ? "" : dateText;
+        }
+
+        private String formatExifDate() {
+            if (exifDateText == null || exifDateText.isEmpty()) return null;
+            try {
+                java.text.SimpleDateFormat inFmt = new java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.getDefault());
+                java.util.Date date = inFmt.parse(exifDateText);
+                if (date != null) {
+                    return new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault()).format(date);
+                }
+            } catch (Exception ignored) {
+            }
+            return exifDateText;
+        }
+
+        String cameraText() {
+            StringBuilder sb = new StringBuilder();
+            if (cameraModel != null && !cameraModel.isEmpty()) {
+                sb.append(cameraModel.trim());
+            }
+            if (lensModel != null && !lensModel.isEmpty()) {
+                if (sb.length() > 0) sb.append(" · ");
+                sb.append(lensModel.trim());
+            }
+            if (cameraMake != null && !cameraMake.isEmpty()) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(cameraMake.trim());
+            }
+            return sb.length() == 0 ? "--" : sb.toString();
+        }
+
+        String focalLengthText() {
+            if (!isKnown(focalLengthMm) || focalLengthMm <= 0) return "--";
+            return String.format(java.util.Locale.getDefault(), "%.2fmm", focalLengthMm);
+        }
+
+        String apertureText() {
+            if (!isKnown(aperture) || aperture <= 0) return "--";
+            return "f/" + trimTrailingZeros(aperture);
+        }
+
+        String shutterText() {
+            if (!isKnown(exposureTimeSeconds) || exposureTimeSeconds <= 0) return "--";
+            if (exposureTimeSeconds < 1.0) {
+                long denom = Math.round(1.0 / exposureTimeSeconds);
+                if (denom > 0) {
+                    return "1/" + denom + "s";
+                }
+            }
+            if (exposureTimeSeconds < 10.0) {
+                return String.format(java.util.Locale.getDefault(), "%.2fs", exposureTimeSeconds);
+            }
+            return String.format(java.util.Locale.getDefault(), "%.0fs", exposureTimeSeconds);
+        }
+
+        String isoText() {
+            return iso > 0 ? "ISO " + iso : "--";
+        }
+
+        String evText() {
+            if (!isKnown(exposureBiasEv)) return "--";
+            return "EV " + trimTrailingZeros(exposureBiasEv);
+        }
+
+        boolean hasExposureInfo() {
+            return (isKnown(focalLengthMm) && focalLengthMm > 0)
+                    || (isKnown(aperture) && aperture > 0)
+                    || (isKnown(exposureTimeSeconds) && exposureTimeSeconds > 0)
+                    || iso > 0
+                    || isKnown(exposureBiasEv);
+        }
+
+        String locationText() {
+            if (hasLatLong()) {
+                return String.format(java.util.Locale.getDefault(), "%.5f, %.5f", latitude, longitude);
+            }
+            return "--";
+        }
+
+        private String trimTrailingZeros(double value) {
+            String text = String.format(java.util.Locale.getDefault(), "%.2f", value);
+            while (text.contains(".") && text.endsWith("0")) {
+                text = text.substring(0, text.length() - 1);
+            }
+            if (text.endsWith(".")) {
+                text = text.substring(0, text.length() - 1);
+            }
+            return text;
+        }
+
+        private boolean isKnown(double value) {
+            return !Double.isNaN(value);
+        }
+
+        private boolean hasLatLong() {
+            return !Float.isNaN(latitude) && !Float.isNaN(longitude);
+        }
+    }
+}

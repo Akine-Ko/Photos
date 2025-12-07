@@ -1,0 +1,157 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "ae5b3ef0b375bfdeb8865b09afa21cec",
+    "entities": [
+      {
+        "tableName": "photo_assets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `contentUri` TEXT NOT NULL, `displayName` TEXT, `dateTaken` INTEGER NOT NULL, `dateModified` INTEGER NOT NULL, `mimeType` TEXT, `size` INTEGER NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `bucketId` TEXT, `bucketName` TEXT, `orientation` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentUri",
+            "columnName": "contentUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateTaken",
+            "columnName": "dateTaken",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateModified",
+            "columnName": "dateModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bucketId",
+            "columnName": "bucketId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bucketName",
+            "columnName": "bucketName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "orientation",
+            "columnName": "orientation",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_photo_assets_dateModified",
+            "unique": false,
+            "columnNames": [
+              "dateModified"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photo_assets_dateModified` ON `${TABLE_NAME}` (`dateModified`)"
+          },
+          {
+            "name": "index_photo_assets_bucketId",
+            "unique": false,
+            "columnNames": [
+              "bucketId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photo_assets_bucketId` ON `${TABLE_NAME}` (`bucketId`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "privacy_overrides",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaKey` TEXT NOT NULL, `policy` INTEGER NOT NULL, `localEncryptedPath` TEXT, `lastUpdated` INTEGER NOT NULL, PRIMARY KEY(`mediaKey`))",
+        "fields": [
+          {
+            "fieldPath": "mediaKey",
+            "columnName": "mediaKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "policy",
+            "columnName": "policy",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localEncryptedPath",
+            "columnName": "localEncryptedPath",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastUpdated",
+            "columnName": "lastUpdated",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaKey"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ae5b3ef0b375bfdeb8865b09afa21cec')"
+    ]
+  }
+}

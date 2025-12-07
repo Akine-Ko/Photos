@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:clipToPadding="false">
+
+    <View
+        android:id="@+id/fastScrollTrack"
+        android:layout_width="@dimen/fast_scroll_track_width"
+        android:layout_height="match_parent"
+        android:layout_gravity="end|center_vertical"
+        android:background="@drawable/bg_fast_scroll_track" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/fastScrollBubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="@dimen/fast_scroll_bubble_spacing"
+        android:alpha="0"
+        android:elevation="6dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/fast_scroll_bubble"
+        app:cardCornerRadius="18dp"
+        app:cardUseCompatPadding="true">
+
+        <TextView
+            android:id="@+id/fastScrollBubbleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="@dimen/fast_scroll_bubble_padding_horizontal"
+            android:paddingVertical="@dimen/fast_scroll_bubble_padding_vertical"
+            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+            android:textColor="@color/fast_scroll_bubble_text"
+            android:text="2023-07-25" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <FrameLayout
+        android:id="@+id/fastScrollThumb"
+        android:layout_width="@dimen/fast_scroll_thumb_width"
+        android:layout_height="@dimen/fast_scroll_thumb_height"
+        android:layout_gravity="center_vertical|end"
+        android:background="@drawable/bg_fast_scroll_thumb"
+        android:elevation="8dp" />
+
+</FrameLayout>

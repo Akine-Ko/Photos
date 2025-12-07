@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_delete_dialog"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="20dp">
+
+    <TextView
+        android:id="@+id/deleteConfirmMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:lineSpacingExtra="2dp"
+        android:text="@string/delete_confirm_message"
+        android:textAppearance="@style/TextAppearance.AppCompat.Title" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/deleteConfirmPositive"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="24dp"
+        android:background="@drawable/bg_delete_confirm_button"
+        android:text="@string/delete_confirm_positive"
+        android:textAllCaps="false"
+        android:textColor="@color/delete_red"
+        android:textStyle="bold" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/deleteConfirmNegative"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_delete_cancel_button"
+        android:text="@string/delete_confirm_negative"
+        android:textAllCaps="false"
+        android:textColor="@color/delete_blue"
+        android:textStyle="bold" />
+
+</LinearLayout>

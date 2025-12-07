@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 品牌主色与语义色，用于主题与控件配色 -->
+    <color name="brand_primary">#4C6EF5</color>
+    <color name="brand_primary_container">#DDE2FF</color>
+    <color name="brand_on_primary">#FFFFFFFF</color>
+    <color name="brand_on_surface">#1C1B1F</color>
+    <color name="brand_outline">#79747E</color>
+    <color name="brand_surface_variant">#E7E0EC</color>
+
+    <!-- 兼容保留 -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- 首页时间线快速滚动 -->
+    <color name="fast_scroll_track">#E6E9F2</color>
+    <color name="fast_scroll_thumb">#4C6EF5</color>
+    <color name="fast_scroll_thumb_pressed">#3B5BDD</color>
+    <color name="fast_scroll_bubble">#4C6EF5</color>
+    <color name="fast_scroll_bubble_text">#FFFFFFFF</color>
+
+    <!-- 删除确认弹窗 -->
+    <color name="delete_red">#FF3B30</color>
+    <color name="delete_red_10">#1AFF3B30</color>
+    <color name="delete_blue">#1E88E5</color>
+    <color name="delete_blue_10">#1A1E88E5</color>
+
+    <!-- 底部导航 -->
+    <color name="bottom_nav_surface">#FFFFFFFF</color>
+    <color name="bottom_nav_stroke">@color/brand_surface_variant</color>
+    <color name="bottom_nav_ripple">#1A4C6EF5</color>
+</resources>

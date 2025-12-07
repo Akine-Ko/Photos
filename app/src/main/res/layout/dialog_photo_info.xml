@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp"
+    android:foreground="?attr/selectableItemBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="20dp"
+            app:cardBackgroundColor="#F7F7FA"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="10dp"
+            app:strokeColor="#08000000"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:divider="?android:attr/dividerHorizontal"
+                android:showDividers="middle"
+                android:dividerPadding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_name"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoName"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_time"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoDate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:includeFontPadding="false" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelSize"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_size"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoSize"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelCamera"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_params"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoCamera"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:includeFontPadding="false"
+                        android:maxLines="2"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/infoExposureCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    app:cardBackgroundColor="#F1F1F5"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="#1A000000"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/infoLabelExposure"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_exposure"
+                            android:textColor="#7A7A7A"
+                            android:textSize="14sp"
+                            android:includeFontPadding="false" />
+
+                        <ImageView
+                            android:id="@+id/infoHistogram"
+                            android:layout_width="match_parent"
+                            android:layout_height="80dp"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:scaleType="centerCrop"
+                            android:background="@drawable/bg_info_histogram" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:weightSum="5"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:id="@+id/infoFocal"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
+                                android:gravity="center_horizontal"
+                                android:includeFontPadding="false" />
+
+                            <TextView
+                                android:id="@+id/infoAperture"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
+                                android:gravity="center_horizontal"
+                                android:includeFontPadding="false" />
+
+                            <TextView
+                                android:id="@+id/infoShutter"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
+                                android:gravity="center_horizontal"
+                                android:includeFontPadding="false" />
+
+                            <TextView
+                                android:id="@+id/infoIso"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
+                                android:gravity="center_horizontal"
+                                android:includeFontPadding="false" />
+
+                            <TextView
+                                android:id="@+id/infoEv"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
+                                android:gravity="center_horizontal"
+                                android:includeFontPadding="false" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelPath"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_path"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoPath"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:includeFontPadding="false"
+                        android:maxLines="2"
+                        android:ellipsize="middle" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/infoLabelLocation"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/info_label_location"
+                        android:textColor="#7A7A7A"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="12dp"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/infoLocation"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:includeFontPadding="false"
+                        android:maxLines="2"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+
+</FrameLayout>

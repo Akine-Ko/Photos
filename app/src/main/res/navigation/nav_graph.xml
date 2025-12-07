@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_home">
+
+    <fragment
+        android:id="@+id/navigation_home"
+        android:name="com.example.photos.ui.home.HomeFragment"
+        android:label="首页"
+        tools:layout="@layout/fragment_home"/>
+
+    <fragment
+        android:id="@+id/navigation_search"
+        android:name="com.example.photos.ui.search.SearchFragment"
+        android:label="搜索"
+        tools:layout="@layout/fragment_search"/>
+
+    <fragment
+        android:id="@+id/navigation_albums"
+        android:name="com.example.photos.ui.albums.AlbumsFragment"
+        android:label="相册"
+        tools:layout="@layout/fragment_albums">
+        <action
+            android:id="@+id/action_albums_to_categoryPhotos"
+            app:destination="@id/navigation_category_photos" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_category_photos"
+        android:name="com.example.photos.ui.albums.CategoryPhotosFragment"
+        android:label="分类图片"
+        tools:layout="@layout/fragment_category_photos">
+        <argument
+            android:name="category"
+            app:argType="string" />
+    </fragment>
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.example.photos.ui.profile.ProfileFragment"
+        android:label="我的"
+        tools:layout="@layout/fragment_profile"/>
+
+</navigation>

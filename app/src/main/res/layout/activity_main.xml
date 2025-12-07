@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <!-- 顶部应用栏：配合 AppBarConfiguration 管理标题与返回键 -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/topAppBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        android:elevation="0dp"
+        android:theme="@style/ThemeOverlay.Material3.ActionBar"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:title="智能相册"
+        app:navigationIconTint="@color/brand_on_surface"
+        app:titleCentered="true"/>
+
+    <!-- Navigation 宿主，用于切换首页/智能分类/我的 -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/nav_host_fragment"
+        android:name="androidx.navigation.fragment.NavHostFragment"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:defaultNavHost="true"
+        app:layout_constraintTop_toBottomOf="@id/topAppBar"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:navGraph="@navigation/nav_graph"/>
+
+    <!-- 底部导航栏：漂浮卡片样式，保持与系统手势区间隔 -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:minHeight="68dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="14dp"
+        android:background="@drawable/bg_bottom_nav"
+        android:elevation="12dp"
+        android:translationZ="12dp"
+        app:itemBackground="@drawable/bottom_nav_item_background"
+        app:itemIconTint="@color/bottom_nav_selector"
+        app:itemTextColor="@color/bottom_nav_selector"
+        app:itemIconSize="26dp"
+        app:itemRippleColor="@color/bottom_nav_ripple"
+        app:itemTextAppearanceActive="@style/BottomNavTextActive"
+        app:itemTextAppearanceInactive="@style/BottomNavTextInactive"
+        app:labelVisibilityMode="labeled"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:menu="@menu/bottom_nav_menu"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

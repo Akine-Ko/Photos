@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">智能相册</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_albums">相册</string>
+    <string name="nav_profile">我的</string>
+
+    <string name="home_greeting_placeholder">智能照片助手</string>
+    <string name="home_greeting_template">%1$s好，欢迎回来</string>
+    <string name="home_greeting_dawn">凌晨</string>
+    <string name="home_greeting_morning">上午</string>
+    <string name="home_greeting_afternoon">下午</string>
+    <string name="home_greeting_evening">晚上</string>
+
+    <string name="home_summary_title">数字影像驾驶舱</string>
+    <string name="home_summary_placeholder">智能引擎正在获取照片洞察</string>
+    <string name="home_summary_total_label">全部资产</string>
+    <string name="home_summary_favorite_label">精选收藏</string>
+    <string name="home_summary_filtered_label">当前筛选</string>
+
+    <string name="home_search_hint">搜索拍摄地点 / 事件 / 标签</string>
+    <string name="home_search_running">正在执行文字检索…</string>
+    <string name="home_search_result_message">找到 %1$d 张与「%2$s」匹配的照片</string>
+    <string name="search_by_image">以图搜图</string>
+    <string name="home_image_search_running">正在执行以图搜图…</string>
+    <string name="home_image_search_result_message">找到 %1$d 张与参考图相似的照片</string>
+
+    <string name="home_photo_content_description">照片缩略图</string>
+    <string name="home_favorite_badge_content_description">精选照片标识</string>
+    <string name="photo_meta_template">%1$s · %2$s</string>
+
+    <string name="albums_header_title">智能分类</string>
+    <string name="albums_empty_state">AI 分类还在进行中，稍后尝试刷新</string>
+    <string name="album_count_template">%1$d 张</string>
+
+    <string name="profile_title">端侧能力控制台</string>
+    <string name="profile_subtitle">管理同步策略、备份频率与隐私设置</string>
+    <string name="profile_button_backup">立即触发增量备份</string>
+    <string name="profile_button_settings">打开隐私与权限设置</string>
+    <string name="profile_backup_on">已开启 Wi‑Fi 自动备份，夜间优先执行</string>
+    <string name="profile_backup_off">已关闭自动备份，保留手动触发能力</string>
+    <string name="profile_mobile_on">移动网络备份开启，将自动识别 1080P 以下低码率资源</string>
+    <string name="profile_mobile_off">移动网络备份关闭，避免额外流量消耗</string>
+    <string name="profile_backup_enqueued">增量备份任务已加入调度队列</string>
+    <string name="profile_settings_hint">跳转设置页前请集成系统权限组</string>
+
+    <string name="profile_classifier_header">智能分类</string>
+    <string name="profile_classifier_summary">第一步会用 MobileCLIP 把照片嵌入特征缓存，第二步再根据固定类别做自动分类。</string>
+    <string name="profile_run_embedding_button">预计算全量向量</string>
+    <string name="profile_run_embedding_sample_button">预计算 200 张向量</string>
+    <string name="profile_run_classifier_button">运行全量分类</string>
+    <string name="profile_run_sample_button">运行 200 张分类</string>
+    <string name="profile_clear_categories_button">清空分类结果</string>
+    <string name="profile_clear_features_button">清空 CLIP 向量缓存</string>
+    <string name="profile_embedding_job_scheduled">已触发 MobileCLIP 向量预计算</string>
+    <string name="profile_embedding_sample_enqueued">已触发 200 张向量预计算</string>
+    <string name="profile_classifier_job_scheduled">已触发自动分类任务</string>
+    <string name="profile_classifier_sample_enqueued">已触发 200 张小样分类</string>
+    <string name="profile_classifier_clear_done">已清空所有分类记录</string>
+    <string name="profile_features_clear_done">已清空所有图片向量缓存</string>
+    <string name="profile_classifier_status_ready">已加载 %1$d 个固定分类</string>
+    <string name="profile_classifier_status_loading">正在加载 CLIP 模型...</string>
+    <string name="profile_classifier_status_failed">尚未检测到 CLIP 模型，请导入 assets/models/clip</string>
+    <string name="profile_progress_label_simple">已处理 %1$d/%2$d</string>
+    <string name="profile_progress_unknown_simple">已处理 %1$d/?</string>
+    <string name="profile_stop_processing">停止</string>
+
+    <string name="share">分享</string>
+    <string name="delete">删除</string>
+    <string name="share_failed">分享失败</string>
+    <string name="delete_failed">删除失败</string>
+    <string name="delete_confirm_message">确定要删除这张图片吗</string>
+    <string name="delete_confirm_positive">确认</string>
+    <string name="delete_confirm_negative">取消</string>
+    <string name="manage_media_permission_needed">需要媒体管理权限才能删除，请在授权弹窗中允许</string>
+    <string name="back">返回</string>
+    <string name="edit">编辑</string>
+    <string name="more">更多</string>
+    <string name="viewer_index_label">第 %1$d 张</string>
+    <string name="viewer_title_default">图库浏览</string>
+    <string name="profile_search_limit_title">搜索返回条数</string>
+    <string name="profile_search_limit_summary">用于文本搜索/以图搜图的最大返回项，默认 4 张。</string>
+    <string name="profile_search_limit_applied">已设置搜索返回条数为 %1$d</string>
+    <string name="label_size">大小 %1$s</string>
+    <string name="label_resolution">分辨率 %1$d × %2$d</string>
+    <string name="info_label_name">名称</string>
+    <string name="info_label_time">时间</string>
+    <string name="info_label_size">大小</string>
+    <string name="info_label_params">参数</string>
+    <string name="info_label_exposure">曝光参数</string>
+    <string name="info_label_path">路径</string>
+    <string name="info_label_location">地点</string>
+    <string name="notification_channel_processing">向量和分类</string>
+    <string name="notification_channel_processing_desc">向量、分类以及索引重建正在运行</string>
+    <string name="notification_embedding_title">正在生成向量</string>
+    <string name="notification_embedding_text">后台预计算图像向量</string>
+    <string name="notification_classify_title">正在分类图片</string>
+    <string name="notification_classify_text">后台运行 AI 自动分类</string>
+</resources>
