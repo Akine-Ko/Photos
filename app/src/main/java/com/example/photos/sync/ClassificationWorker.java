@@ -60,9 +60,10 @@ public class ClassificationWorker extends Worker {
         int limit = getInputData().getInt(KEY_LIMIT, 120);
         boolean reprocess = getInputData().getBoolean(KEY_REPROCESS, false);
         Context app = getApplicationContext();
+        Log.i(TAG, "Start classification mode=" + mode + " full=" + full + " limit=" + limit + " reprocess=" + reprocess);
         if (!startForeground()) {
-            Log.w(TAG, "Foreground start failed; will retry");
-            return Result.retry();
+            Log.e(TAG, "Foreground start failed; failing fast for debug");
+            return Result.failure();
         }
         ClipClassifier.warmup(app);
         ClipClassifier.Status status = ClipClassifier.status(app);
@@ -75,15 +76,15 @@ public class ClassificationWorker extends Worker {
         CategoryDao categoryDao = db.categoryDao();
         FeatureDao featureDao = db.featureDao();
         try {
-        if (full) {
-            runFullClassification(photoDao, categoryDao, featureDao);
-        } else {
-            runRecentClassification(photoDao, categoryDao, featureDao, limit, reprocess);
-        }
+            if (full) {
+                runFullClassification(photoDao, categoryDao, featureDao);
+            } else {
+                runRecentClassification(photoDao, categoryDao, featureDao, limit, reprocess);
+            }
             return Result.success();
         } catch (Throwable t) {
-            Log.w(TAG, "Classification run failed: " + t);
-            return Result.retry();
+            Log.e(TAG, "Classification run failed", t);
+            return Result.failure();
         }
     }
 
@@ -94,10 +95,12 @@ public class ClassificationWorker extends Worker {
                                          boolean reprocess) {
         if (limit <= 0) limit = 120;
         List<PhotoAsset> latest = photoDao.queryLatest(limit);
+        Log.i(TAG, "runRecentClassification fetched=" + (latest == null ? 0 : latest.size()));
         if (isStopped()) return;
         int total = latest == null ? 0 : latest.size();
         resetProgress(total);
         classifyBatch(latest, categoryDao, featureDao, reprocess);
+        Log.i(TAG, "Classification recent done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
     }
 
     private void runFullClassification(PhotoDao photoDao,
@@ -106,6 +109,7 @@ public class ClassificationWorker extends Worker {
         final int PAGE = 200;
         int offset = 0;
         int total = photoDao.countAll();
+        Log.i(TAG, "runFullClassification total=" + total + " page=" + PAGE);
         resetProgress(total);
         while (!isStopped()) {
             List<PhotoAsset> page = photoDao.queryPaged(PAGE, offset);
@@ -114,6 +118,7 @@ public class ClassificationWorker extends Worker {
             offset += PAGE;
         }
         updateProgress(progressProcessed, progressTotal);
+        Log.i(TAG, "Classification full done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
     }
 
     private int classifyBatch(List<PhotoAsset> assets,
@@ -134,6 +139,7 @@ public class ClassificationWorker extends Worker {
             } else {
                 categoryDao.deleteByMediaKey(asset.contentUri);
             }
+            Log.d(TAG, "classify asset=" + asset.contentUri + " reprocess=" + reprocessExisting);
             float[] embedding = loadEmbedding(asset.contentUri, featureDao);
             if (isStopped()) return visited;
             if (embedding == null || embedding.length == 0) continue;
@@ -213,13 +219,21 @@ public class ClassificationWorker extends Worker {
         return requestBuilder.build();
     }
 
+    @Override
+    public void onStopped() {
+        super.onStopped();
+        Log.w(TAG, "onStopped() called, isStopped=" + isStopped());
+    }
+
     private boolean startForeground() {
         try {
             setForegroundAsync(ForegroundHelper.create(
                     getApplicationContext(),
                     getApplicationContext().getString(R.string.notification_classify_title),
                     getApplicationContext().getString(R.string.notification_classify_text),
-                    NOTIFICATION_ID
+                    NOTIFICATION_ID,
+                    0,
+                    progressTotal
             )).get(3, TimeUnit.SECONDS);
             return true;
         } catch (Exception e) {
@@ -233,6 +247,7 @@ public class ClassificationWorker extends Worker {
                 .putInt("processed", processed)
                 .putInt("total", total)
                 .build());
+        updateForeground(processed, total);
     }
 
     private void resetProgress(int total) {
@@ -286,6 +301,21 @@ public class ClassificationWorker extends Worker {
             return last != null ? last : "";
         } catch (Throwable t) {
             return "";
+        }
+    }
+
+    private void updateForeground(int processed, int total) {
+        try {
+            setForegroundAsync(ForegroundHelper.create(
+                    getApplicationContext(),
+                    getApplicationContext().getString(R.string.notification_classify_title),
+                    getApplicationContext().getString(R.string.notification_classify_text),
+                    NOTIFICATION_ID,
+                    processed,
+                    total
+            ));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to update foreground notification", e);
         }
     }
 }

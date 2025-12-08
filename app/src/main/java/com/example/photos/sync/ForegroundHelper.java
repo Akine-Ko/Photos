@@ -18,14 +18,25 @@ final class ForegroundHelper {
     private ForegroundHelper() {}
 
     static ForegroundInfo create(Context ctx, String title, String text, int notificationId) {
+        return create(ctx, title, text, notificationId, -1, -1);
+    }
+
+    static ForegroundInfo create(Context ctx, String title, String text, int notificationId, int processed, int total) {
         createChannel(ctx);
-        Notification notification = new NotificationCompat.Builder(ctx, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_nav_search)
                 .setOngoing(true)
                 .setSilent(true)
-                .build();
+                .setOnlyAlertOnce(true);
+        if (processed >= 0 && total != 0) {
+            boolean indeterminate = total < 0;
+            int safeTotal = indeterminate ? 0 : Math.max(total, processed);
+            int safeProcessed = Math.max(0, processed);
+            builder.setProgress(safeTotal, safeProcessed, indeterminate);
+        }
+        Notification notification = builder.build();
         int typeMask = 0;
         if (Build.VERSION.SDK_INT >= 29) {
             typeMask = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC;

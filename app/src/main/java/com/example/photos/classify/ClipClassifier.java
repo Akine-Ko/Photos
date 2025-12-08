@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.util.Log;
 
 import com.example.photos.db.PhotoAsset;
+import com.example.photos.model.NnapiController;
 import com.example.photos.search.ClipTextEncoder;
 
 import org.json.JSONArray;
@@ -119,14 +120,42 @@ public final class ClipClassifier {
                     copyAssetToCache(context, modelExtAsset, fileName(modelExtAsset, "image_encoder.onnx.data"));
                 }
                 env = OrtEnvironment.getEnvironment();
-                session = env.createSession(model.getAbsolutePath(), new OrtSession.SessionOptions());
+                boolean useNnapi = NnapiController.shouldUseNnapi(context, "clip_image");
+                session = createSession(model.getAbsolutePath(), useNnapi, context);
+                if (session == null) {
+                    throw new IllegalStateException("Session init failed");
+                }
+                NnapiController.recordSuccess(context, "clip_image");
                 inputName = session.getInputNames().iterator().next();
                 initialized = true;
-                Log.i(TAG, "ClipClassifier initialized. labels=" + labels.size() + " embDim=" + embeddingDim);
+                Log.i(TAG, "ClipClassifier initialized. labels=" + labels.size() + " embDim=" + embeddingDim
+                        + " nnapi=" + useNnapi);
             } catch (Throwable t) {
                 initFailed = true;
                 Log.w(TAG, "Failed to initialize ClipClassifier: " + t);
             }
+        }
+    }
+
+    private static OrtSession createSession(String modelPath, boolean useNnapi, Context context) {
+        try {
+            OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
+            if (useNnapi) {
+                opts.addNnapi();
+            }
+            return env.createSession(modelPath, opts);
+        } catch (Throwable t) {
+            Log.w(TAG, "createSession failed nnapi=" + useNnapi + " err=" + t);
+            if (useNnapi) {
+                NnapiController.recordFailure(context, "clip_image");
+                try {
+                    OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
+                    return env.createSession(modelPath, opts);
+                } catch (Throwable ignore) {
+                    // fall through
+                }
+            }
+            return null;
         }
     }
 

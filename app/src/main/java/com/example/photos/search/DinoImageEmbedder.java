@@ -10,6 +10,7 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 
 import com.example.photos.db.PhotoAsset;
+import com.example.photos.model.NnapiController;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -107,7 +108,19 @@ public final class DinoImageEmbedder {
                 }
                 OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
                 env = OrtEnvironment.getEnvironment();
-                session = env.createSession(model.getAbsolutePath(), opts);
+                boolean useNnapi = NnapiController.shouldUseNnapi(context, "dino_image");
+                if (useNnapi) {
+                    opts.addNnapi();
+                }
+                try {
+                    session = env.createSession(model.getAbsolutePath(), opts);
+                    NnapiController.recordSuccess(context, "dino_image");
+                } catch (Throwable nnapiErr) {
+                    Log.w(TAG, "NNAPI session failed for DINO, fallback to CPU", nnapiErr);
+                    NnapiController.recordFailure(context, "dino_image");
+                    OrtSession.SessionOptions cpuOpts = new OrtSession.SessionOptions();
+                    session = env.createSession(model.getAbsolutePath(), cpuOpts);
+                }
                 if (modelData != null && modelData.exists()) {
                     // External data is resolved automatically when placed next to the model.
                 }

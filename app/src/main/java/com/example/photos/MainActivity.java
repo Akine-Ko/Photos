@@ -27,6 +27,8 @@ public class MainActivity extends AppCompatActivity {
 
     private com.example.photos.media.MediaSyncManager syncManager;
     private boolean permissionRequestedOnce = false;
+    private boolean notificationRequestedOnce = false;
+    private boolean batteryPromptedOnce = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +62,20 @@ public class MainActivity extends AppCompatActivity {
         } else if (!permissionRequestedOnce) {
             permissionRequestedOnce = true;
             com.example.photos.permissions.PermissionsHelper.requestMediaPermission(this);
+        }
+
+        // 通知权限（Android 13+），用于前台服务通知显示进度
+        if (!notificationRequestedOnce
+                && !com.example.photos.permissions.PermissionsHelper.hasNotificationPermission(this)) {
+            notificationRequestedOnce = true;
+            com.example.photos.permissions.PermissionsHelper.requestNotificationPermission(this);
+        }
+
+        // 忽略电池优化（Doze），提示用户手动放行
+        if (!batteryPromptedOnce
+                && !com.example.photos.permissions.PermissionsHelper.isIgnoringBatteryOptimizations(this)) {
+            batteryPromptedOnce = true;
+            com.example.photos.permissions.PermissionsHelper.requestIgnoreBatteryOptimizations(this);
         }
 
         // Activity 中只保留一个 NavHost 承载各个 Fragment。

@@ -60,9 +60,10 @@ public class ClipEmbeddingWorker extends Worker {
         int limit = getInputData().getInt(KEY_LIMIT, 120);
         boolean force = getInputData().getBoolean(KEY_FORCE, false);
         Context app = getApplicationContext();
+        Log.i(TAG, "Start embedding mode=" + mode + " full=" + full + " limit=" + limit + " force=" + force);
         if (!startForeground()) {
-            Log.w(TAG, "Foreground start failed; will retry");
-            return Result.retry();
+            Log.e(TAG, "Foreground start failed; failing fast for debug");
+            return Result.failure();
         }
         ClipClassifier.warmup(app);
         DinoImageEmbedder.warmup(app);
@@ -77,14 +78,15 @@ public class ClipEmbeddingWorker extends Worker {
             }
             return Result.success();
         } catch (Throwable t) {
-            Log.w(TAG, "Embedding run failed: " + t);
-            return Result.retry();
+            Log.e(TAG, "Embedding run failed", t);
+            return Result.failure();
         }
     }
 
     private void runRecent(PhotoDao photoDao, FeatureDao featureDao, int limit, boolean force) {
         if (limit <= 0) limit = 120;
         List<PhotoAsset> latest = photoDao.queryLatest(limit);
+        Log.i(TAG, "runRecent fetched=" + (latest == null ? 0 : latest.size()));
         if (isStopped()) return;
         resetProgress(latest == null ? 0 : latest.size());
         encodeBatch(latest, featureDao, force);
@@ -94,12 +96,14 @@ public class ClipEmbeddingWorker extends Worker {
         rebuildFaceHnsw(featureDao);
         if (isStopped()) return;
         rebuildClipHnsw(featureDao);
+        Log.i(TAG, "Embedding recent done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
     }
 
     private void runFull(PhotoDao photoDao, FeatureDao featureDao, boolean force) {
         final int PAGE = 200;
         int offset = 0;
         int total = photoDao.countAll();
+        Log.i(TAG, "runFull total=" + total + " page=" + PAGE);
         resetProgress(total);
         while (!isStopped()) {
             List<PhotoAsset> page = photoDao.queryPaged(PAGE, offset);
@@ -113,6 +117,7 @@ public class ClipEmbeddingWorker extends Worker {
         rebuildFaceHnsw(featureDao);
         if (isStopped()) return;
         rebuildClipHnsw(featureDao);
+        Log.i(TAG, "Embedding full done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
     }
 
     private void encodeBatch(List<PhotoAsset> assets, FeatureDao featureDao, boolean force) {
@@ -124,6 +129,10 @@ public class ClipEmbeddingWorker extends Worker {
             boolean needClip = force || featureDao.countByKeyAndType(asset.contentUri, FeatureType.CLIP_IMAGE_EMB.getCode()) == 0;
             boolean needDino = force || featureDao.countByKeyAndType(asset.contentUri, FeatureType.DINO_IMAGE_EMB.getCode()) == 0;
             boolean needFace = force || featureDao.countByKeyAndType(asset.contentUri, FeatureType.FACE_SFACE_EMB.getCode()) == 0;
+            Log.d(TAG, "asset=" + asset.contentUri
+                    + " needClip=" + needClip
+                    + " needDino=" + needDino
+                    + " needFace=" + needFace);
             if (!needClip && !needDino && !needFace) continue;
             if (force) {
                 if (needClip) {
@@ -295,13 +304,21 @@ public class ClipEmbeddingWorker extends Worker {
         return requestBuilder.build();
     }
 
+    @Override
+    public void onStopped() {
+        super.onStopped();
+        Log.w(TAG, "onStopped() called, isStopped=" + isStopped());
+    }
+
     private boolean startForeground() {
         try {
             setForegroundAsync(ForegroundHelper.create(
                     getApplicationContext(),
                     getApplicationContext().getString(R.string.notification_embedding_title),
                     getApplicationContext().getString(R.string.notification_embedding_text),
-                    NOTIFICATION_ID
+                    NOTIFICATION_ID,
+                    0,
+                    progressTotal
             )).get(3, TimeUnit.SECONDS);
             return true;
         } catch (Exception e) {
@@ -314,6 +331,7 @@ public class ClipEmbeddingWorker extends Worker {
         progressTotal = total;
         progressProcessed = 0;
         updateProgress();
+        updateForeground(progressProcessed, progressTotal);
     }
 
     private void incrementProgress() {
@@ -322,6 +340,7 @@ public class ClipEmbeddingWorker extends Worker {
             progressTotal = progressProcessed;
         }
         updateProgress();
+        updateForeground(progressProcessed, progressTotal);
     }
 
     private void updateProgress() {
@@ -329,5 +348,20 @@ public class ClipEmbeddingWorker extends Worker {
                 .putInt("processed", progressProcessed)
                 .putInt("total", progressTotal)
                 .build());
+    }
+
+    private void updateForeground(int processed, int total) {
+        try {
+            setForegroundAsync(ForegroundHelper.create(
+                    getApplicationContext(),
+                    getApplicationContext().getString(R.string.notification_embedding_title),
+                    getApplicationContext().getString(R.string.notification_embedding_text),
+                    NOTIFICATION_ID,
+                    processed,
+                    total
+            ));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to update foreground notification", e);
+        }
     }
 }
