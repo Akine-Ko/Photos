@@ -60,7 +60,10 @@ public class ClassificationWorker extends Worker {
         int limit = getInputData().getInt(KEY_LIMIT, 120);
         boolean reprocess = getInputData().getBoolean(KEY_REPROCESS, false);
         Context app = getApplicationContext();
-        startForeground();
+        if (!startForeground()) {
+            Log.w(TAG, "Foreground start failed; will retry");
+            return Result.retry();
+        }
         ClipClassifier.warmup(app);
         ClipClassifier.Status status = ClipClassifier.status(app);
         if (!status.ready) {
@@ -210,7 +213,7 @@ public class ClassificationWorker extends Worker {
         return requestBuilder.build();
     }
 
-    private void startForeground() {
+    private boolean startForeground() {
         try {
             setForegroundAsync(ForegroundHelper.create(
                     getApplicationContext(),
@@ -218,8 +221,10 @@ public class ClassificationWorker extends Worker {
                     getApplicationContext().getString(R.string.notification_classify_text),
                     NOTIFICATION_ID
             )).get(3, TimeUnit.SECONDS);
+            return true;
         } catch (Exception e) {
             Log.w(TAG, "Failed to start foreground notification", e);
+            return false;
         }
     }
 

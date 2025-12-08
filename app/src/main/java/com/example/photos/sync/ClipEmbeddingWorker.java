@@ -60,7 +60,10 @@ public class ClipEmbeddingWorker extends Worker {
         int limit = getInputData().getInt(KEY_LIMIT, 120);
         boolean force = getInputData().getBoolean(KEY_FORCE, false);
         Context app = getApplicationContext();
-        startForeground();
+        if (!startForeground()) {
+            Log.w(TAG, "Foreground start failed; will retry");
+            return Result.retry();
+        }
         ClipClassifier.warmup(app);
         DinoImageEmbedder.warmup(app);
         PhotosDb db = PhotosDb.get(app);
@@ -292,7 +295,7 @@ public class ClipEmbeddingWorker extends Worker {
         return requestBuilder.build();
     }
 
-    private void startForeground() {
+    private boolean startForeground() {
         try {
             setForegroundAsync(ForegroundHelper.create(
                     getApplicationContext(),
@@ -300,8 +303,10 @@ public class ClipEmbeddingWorker extends Worker {
                     getApplicationContext().getString(R.string.notification_embedding_text),
                     NOTIFICATION_ID
             )).get(3, TimeUnit.SECONDS);
+            return true;
         } catch (Exception e) {
             Log.w(TAG, "Failed to start foreground notification", e);
+            return false;
         }
     }
 

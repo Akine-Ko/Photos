@@ -27,11 +27,7 @@ final class ForegroundHelper {
                 .setSilent(true)
                 .build();
         int typeMask = 0;
-        if (Build.VERSION.SDK_INT >= 34) {
-            typeMask = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                    | ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING;
-            return new ForegroundInfo(notificationId, notification, typeMask);
-        } else if (Build.VERSION.SDK_INT >= 29) {
+        if (Build.VERSION.SDK_INT >= 29) {
             typeMask = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC;
             return new ForegroundInfo(notificationId, notification, typeMask);
         } else {
