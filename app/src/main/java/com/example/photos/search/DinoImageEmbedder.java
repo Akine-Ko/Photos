@@ -44,6 +44,8 @@ public final class DinoImageEmbedder {
     private static volatile boolean initFailed = false;
     private static OrtEnvironment env;
     private static OrtSession session;
+    private static boolean usingNnapi = false;
+    private static String cachedModelPath;
     private static String inputName = "pixel_values";
     private static String outputName = "pooler_output";
     private static int inputSize = 224;
@@ -81,7 +83,20 @@ public final class DinoImageEmbedder {
             bmp = decodeAndCenterCrop(context, uri, inputSize, inputSize);
             if (bmp == null) return null;
             float[] chw = toCHWNormalized(bmp);
-            float[] embedding = runOnnx(chw);
+            float[] embedding = null;
+            try {
+                embedding = runOnnx(chw);
+                NnapiController.recordSuccess(context, "dino_image");
+            } catch (Throwable t) {
+                Log.w(TAG, "runOnnx failed (dino_image) nnapi=" + usingNnapi + " err=" + t);
+                if (usingNnapi && fallbackToCpu(context)) {
+                    try {
+                        embedding = runOnnx(chw);
+                    } catch (Throwable t2) {
+                        Log.w(TAG, "runOnnx retry on CPU failed", t2);
+                    }
+                }
+            }
             if (embedding == null) return null;
             l2Normalize(embedding);
             return embedding;
@@ -106,6 +121,7 @@ public final class DinoImageEmbedder {
                 if (model == null || !model.exists()) {
                     throw new IllegalStateException("Model asset missing: " + modelAsset);
                 }
+                cachedModelPath = model.getAbsolutePath();
                 OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
                 env = OrtEnvironment.getEnvironment();
                 boolean useNnapi = NnapiController.shouldUseNnapi(context, "dino_image");
@@ -113,13 +129,15 @@ public final class DinoImageEmbedder {
                     opts.addNnapi();
                 }
                 try {
-                    session = env.createSession(model.getAbsolutePath(), opts);
+                    session = env.createSession(cachedModelPath, opts);
+                    usingNnapi = useNnapi;
                     NnapiController.recordSuccess(context, "dino_image");
                 } catch (Throwable nnapiErr) {
                     Log.w(TAG, "NNAPI session failed for DINO, fallback to CPU", nnapiErr);
                     NnapiController.recordFailure(context, "dino_image");
                     OrtSession.SessionOptions cpuOpts = new OrtSession.SessionOptions();
-                    session = env.createSession(model.getAbsolutePath(), cpuOpts);
+                    session = env.createSession(cachedModelPath, cpuOpts);
+                    usingNnapi = false;
                 }
                 if (modelData != null && modelData.exists()) {
                     // External data is resolved automatically when placed next to the model.
@@ -296,6 +314,25 @@ public final class DinoImageEmbedder {
             return assetPath.substring(idx + 1);
         }
         return assetPath;
+    }
+
+    private static boolean fallbackToCpu(Context context) {
+        synchronized (LOCK) {
+            if (!usingNnapi || env == null || cachedModelPath == null) {
+                return false;
+            }
+            try {
+                OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
+                session = env.createSession(cachedModelPath, opts);
+                usingNnapi = false;
+                NnapiController.recordFailure(context, "dino_image");
+                Log.w(TAG, "Fallback to CPU session for dino_image");
+                return true;
+            } catch (Throwable t) {
+                Log.w(TAG, "Fallback to CPU session failed", t);
+                return false;
+            }
+        }
     }
 
     private static byte[] readAll(InputStream is) throws Exception {

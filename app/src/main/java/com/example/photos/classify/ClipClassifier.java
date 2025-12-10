@@ -51,6 +51,8 @@ public final class ClipClassifier {
     private static volatile boolean initFailed = false;
     private static OrtEnvironment env;
     private static OrtSession session;
+    private static boolean usingNnapi = false;
+    private static String cachedModelPath;
     private static List<String> labels = new ArrayList<>();
     private static float[] labelEmbeddings;
     private static int embeddingDim = 0;
@@ -60,6 +62,8 @@ public final class ClipClassifier {
     private static String inputName = "images";
     private static String modelAsset = DEFAULT_MODEL_ASSET;
     private static String modelExtAsset = DEFAULT_MODEL_EXT_ASSET;
+    private static String textModelAsset = "models/clip/vit-b-16.txt.fp16.onnx";
+    private static String textModelDataAsset = null;
     private static final float DEFAULT_THRESHOLD = 0.6f;
     private static final Map<String, Float> thresholds = new HashMap<>();
 
@@ -84,6 +88,7 @@ public final class ClipClassifier {
                 loadConfig(am);
                 List<String> loadedLabels = loadLabels(am, LABELS_ASSET);
                 labels = loadedLabels;
+                ClipTextEncoder.setModelAssets(textModelAsset, textModelDataAsset);
 
                 float[] precomputed = loadEmbeddings(am, "models/clip/text_embeds_f32.bin");
                 if (precomputed != null) {
@@ -121,7 +126,8 @@ public final class ClipClassifier {
                 }
                 env = OrtEnvironment.getEnvironment();
                 boolean useNnapi = NnapiController.shouldUseNnapi(context, "clip_image");
-                session = createSession(model.getAbsolutePath(), useNnapi, context);
+                cachedModelPath = model.getAbsolutePath();
+                session = createSession(cachedModelPath, useNnapi, context);
                 if (session == null) {
                     throw new IllegalStateException("Session init failed");
                 }
@@ -129,7 +135,7 @@ public final class ClipClassifier {
                 inputName = session.getInputNames().iterator().next();
                 initialized = true;
                 Log.i(TAG, "ClipClassifier initialized. labels=" + labels.size() + " embDim=" + embeddingDim
-                        + " nnapi=" + useNnapi);
+                        + " nnapi=" + usingNnapi);
             } catch (Throwable t) {
                 initFailed = true;
                 Log.w(TAG, "Failed to initialize ClipClassifier: " + t);
@@ -143,14 +149,18 @@ public final class ClipClassifier {
             if (useNnapi) {
                 opts.addNnapi();
             }
-            return env.createSession(modelPath, opts);
+            OrtSession s = env.createSession(modelPath, opts);
+            usingNnapi = useNnapi;
+            return s;
         } catch (Throwable t) {
             Log.w(TAG, "createSession failed nnapi=" + useNnapi + " err=" + t);
             if (useNnapi) {
                 NnapiController.recordFailure(context, "clip_image");
                 try {
                     OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-                    return env.createSession(modelPath, opts);
+                    OrtSession s = env.createSession(modelPath, opts);
+                    usingNnapi = false;
+                    return s;
                 } catch (Throwable ignore) {
                     // fall through
                 }
@@ -174,7 +184,20 @@ public final class ClipClassifier {
             bmp = decodeAndCenterCrop(context, Uri.parse(asset.contentUri), inputSize, inputSize);
             if (bmp == null) return null;
             float[] chw = toCHWClipNormalized(bmp);
-            float[] imgEmb = runOnnx(chw);
+            float[] imgEmb = null;
+            try {
+                imgEmb = runOnnx(chw);
+                NnapiController.recordSuccess(context, "clip_image");
+            } catch (Throwable t) {
+                Log.w(TAG, "runOnnx failed (clip_image) nnapi=" + usingNnapi + " err=" + t);
+                if (usingNnapi && fallbackToCpu(context)) {
+                    try {
+                        imgEmb = runOnnx(chw);
+                    } catch (Throwable t2) {
+                        Log.w(TAG, "runOnnx retry on CPU failed", t2);
+                    }
+                }
+            }
             if (imgEmb == null) return null;
             l2Normalize(imgEmb, 0, imgEmb.length);
             return imgEmb;
@@ -209,6 +232,25 @@ public final class ClipClassifier {
             }
         }
         return bestLabel == null ? null : new Result(bestLabel, bestScore);
+    }
+
+    private static boolean fallbackToCpu(Context context) {
+        synchronized (LOCK) {
+            if (!usingNnapi || env == null || cachedModelPath == null) {
+                return false;
+            }
+            try {
+                OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
+                session = env.createSession(cachedModelPath, opts);
+                usingNnapi = false;
+                NnapiController.recordFailure(context, "clip_image");
+                Log.w(TAG, "Fallback to CPU session for clip_image");
+                return true;
+            } catch (Throwable t) {
+                Log.w(TAG, "Fallback to CPU session failed", t);
+                return false;
+            }
+        }
     }
 
     private static float[] runOnnx(float[] chw) throws Exception {
@@ -255,6 +297,18 @@ public final class ClipClassifier {
                 modelExtAsset = "models/clip/" + modelExtFile;
             } else {
                 modelExtAsset = DEFAULT_MODEL_EXT_ASSET;
+            }
+            String textModelFile = obj.optString("text_model_file", null);
+            if (textModelFile != null && !textModelFile.isEmpty()) {
+                textModelAsset = "models/clip/" + textModelFile;
+            } else {
+                textModelAsset = "models/clip/vit-b-16.txt.fp16.onnx";
+            }
+            String textModelDataFile = obj.optString("text_model_data_file", null);
+            if (textModelDataFile != null && !textModelDataFile.isEmpty()) {
+                textModelDataAsset = "models/clip/" + textModelDataFile;
+            } else {
+                textModelDataAsset = null;
             }
             thresholds.clear();
             JSONObject th = obj.optJSONObject("thresholds");

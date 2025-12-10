@@ -17,7 +17,7 @@ import ai.onnxruntime.OrtSession;
 public final class ClipTextEncoder {
 
     private static final String TAG = "ClipTextEncoder";
-    private static final String MODEL_NAME = "models/clip/vit-b-16.txt.fp16.onnx";
+    private static final String DEFAULT_MODEL_ASSET = "models/clip/vit-b-16.txt.fp16.onnx";
     private static final String INPUT_NAME = "text";
 
     private static final Object LOCK = new Object();
@@ -26,8 +26,32 @@ public final class ClipTextEncoder {
     private static OrtEnvironment env;
     private static OrtSession session;
     private static ClipTextTokenizer tokenizer;
+    private static String modelAsset = DEFAULT_MODEL_ASSET;
+    private static String modelDataAsset = null;
 
     private ClipTextEncoder() {}
+
+    public static void setModelAssets(String assetPath, String dataPath) {
+        synchronized (LOCK) {
+            String resolvedAsset = (assetPath == null || assetPath.trim().isEmpty())
+                    ? DEFAULT_MODEL_ASSET : assetPath;
+            String resolvedData = (dataPath != null && !dataPath.trim().isEmpty()) ? dataPath : null;
+            boolean changed = !resolvedAsset.equals(modelAsset)
+                    || ((modelDataAsset == null && resolvedData != null)
+                    || (modelDataAsset != null && !modelDataAsset.equals(resolvedData)));
+            if (changed) {
+                modelAsset = resolvedAsset;
+                modelDataAsset = resolvedData;
+                if (session != null) {
+                    try {
+                        session.close();
+                    } catch (Exception ignore) { }
+                    session = null;
+                }
+                initialized = false;
+            }
+        }
+    }
 
     public static float[] encode(Context context, String text) {
         ensureInitialized(context.getApplicationContext());
@@ -66,8 +90,12 @@ public final class ClipTextEncoder {
             if (initialized) return;
             try {
                 env = OrtEnvironment.getEnvironment();
-                File modelFile = copyAsset(context, MODEL_NAME, fileName(MODEL_NAME));
-                copyExtraIfExists(context, MODEL_NAME + ".extra_file", fileName(MODEL_NAME + ".extra_file"));
+                File modelFile = copyAsset(context, modelAsset, fileName(modelAsset));
+                if (modelDataAsset != null) {
+                    copyExtraIfExists(context, modelDataAsset, fileName(modelDataAsset));
+                } else {
+                    copyExtraIfExists(context, modelAsset + ".extra_file", fileName(modelAsset + ".extra_file"));
+                }
                 session = env.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
                 tokenizer = new ClipTextTokenizer(context);
                 Log.i(TAG, "Text encoder initialized. inputs=" + session.getInputNames() + " outputs=" + session.getOutputNames());

@@ -108,7 +108,7 @@ public class ProfileFragment extends Fragment {
         }
         if (embedSampleButton != null) {
             embedSampleButton.setOnClickListener(v -> {
-                ClipEmbeddingWorker.enqueueSample(requireContext(), 200, true);
+                ClipEmbeddingWorker.enqueueSample(requireContext(), 200, false);
                 showSnackbar(v, getString(R.string.profile_embedding_sample_enqueued));
             });
         }

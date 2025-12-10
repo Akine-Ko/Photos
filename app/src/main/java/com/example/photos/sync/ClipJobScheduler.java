@@ -28,7 +28,7 @@ public final class ClipJobScheduler {
 
     public static void enqueueSamplePipeline(Context context, int limit) {
         enqueue(context,
-                ClipEmbeddingWorker.newSampleWorkRequest(limit, true),
+                ClipEmbeddingWorker.newSampleWorkRequest(limit, false),
                 ClassificationWorker.newSampleWorkRequest(limit),
                 PIPELINE_SAMPLE,
                 ExistingWorkPolicy.REPLACE);

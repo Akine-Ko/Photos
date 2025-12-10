@@ -1,252 +1,200 @@
 package com.example.photos.search;
 
 import android.content.Context;
+import android.util.Pair;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.text.Normalizer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 
 /**
- * Minimal BERT WordPiece tokenizer for Chinese-CLIP (context length 52).
- *
- * The vocab is loaded from assets/models/clip/vocab.txt and we follow the same steps as
- * cn_clip.clip.utils.tokenize: [CLS] + wordpiece tokens + [SEP], padded with 0.
+ * OpenCLIP simple tokenizer (context length 77) for MobileCLIP2.
+ * <p>
+ * Ported from OpenAI CLIP simple_tokenizer.py and OpenCLIP. Uses merges from
+ * assets/models/clip/bpe_simple_vocab_16e6.txt.gz.
  */
 final class ClipTextTokenizer {
 
-    private static final int CONTEXT_LENGTH = 52;
-    private static final String VOCAB_ASSET = "models/clip/vocab.txt";
-    private static final String UNK = "[UNK]";
-    private static final String CLS = "[CLS]";
-    private static final String SEP = "[SEP]";
-    private static final int MAX_CHARS_PER_WORD = 200;
+    private static final int CONTEXT_LENGTH = 77;
+    private static final String BPE_ASSET = "models/clip/bpe_simple_vocab_16e6.txt.gz";
+    private static final String SOT_TOKEN = "<|startoftext|>";
+    private static final String EOT_TOKEN = "<|endoftext|>";
 
-    private final Map<String, Integer> vocab;
-    private final int clsId;
-    private final int sepId;
-    private final int unkId;
-    private final BasicTokenizer basicTokenizer = new BasicTokenizer(true);
+    private final Map<String, Integer> encoder;
+    private final Map<Pair<String, String>, Integer> bpeRanks;
+    private final Pattern pat = Pattern.compile("'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+",
+            Pattern.UNICODE_CHARACTER_CLASS);
 
     ClipTextTokenizer(Context context) throws IOException {
-        this.vocab = loadVocab(context);
-        clsId = idFor(CLS);
-        sepId = idFor(SEP);
-        unkId = idFor(UNK);
+        List<String> merges = loadMerges(context);
+        Map<Integer, String> byteEncoder = bytesToUnicode();
+        Map<String, Integer> byteDecoder = new LinkedHashMap<>();
+        for (Map.Entry<Integer, String> e : byteEncoder.entrySet()) {
+            byteDecoder.put(e.getValue(), e.getKey());
+        }
+        List<String> vocab = new ArrayList<>(byteEncoder.values());
+        List<Pair<String, String>> mergesPairs = new ArrayList<>();
+        for (String merge : merges) {
+            String[] parts = merge.split(" ");
+            if (parts.length == 2) {
+                mergesPairs.add(new Pair<>(parts[0], parts[1]));
+            }
+        }
+        for (Pair<String, String> p : mergesPairs) {
+            vocab.add(p.first + p.second);
+        }
+        vocab.add(SOT_TOKEN);
+        vocab.add(EOT_TOKEN);
+        encoder = new LinkedHashMap<>();
+        for (int i = 0; i < vocab.size(); i++) {
+            encoder.put(vocab.get(i), i);
+        }
+        bpeRanks = new LinkedHashMap<>();
+        for (int i = 0; i < mergesPairs.size(); i++) {
+            bpeRanks.put(mergesPairs.get(i), i);
+        }
     }
 
     int[] tokenize(String text) {
-        String safe = text == null ? "" : text;
-        List<Integer> ids = new ArrayList<>();
-        ids.add(clsId);
-        List<String> basic = basicTokenizer.tokenize(safe);
-        for (String token : basic) {
-            for (String piece : wordpiece(token)) {
-                ids.add(idFor(piece));
+        if (text == null) text = "";
+        List<Integer> tokens = new ArrayList<>();
+        tokens.add(encoder.get(SOT_TOKEN));
+        Matcher m = pat.matcher(text);
+        while (m.find()) {
+            String tok = m.group();
+            byte[] utf8 = tok.getBytes(StandardCharsets.UTF_8);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : utf8) {
+                sb.append(bytesToUnicode().get(b & 0xFF));
             }
+            List<String> bpeTokens = bpe(sb.toString());
+            for (String bpeTok : bpeTokens) {
+                Integer id = encoder.get(bpeTok);
+                if (id != null) tokens.add(id);
+            }
+            if (tokens.size() >= CONTEXT_LENGTH - 1) break;
         }
-        if (ids.size() > CONTEXT_LENGTH - 1) {
-            ids = ids.subList(0, CONTEXT_LENGTH - 1);
-        }
-        ids.add(sepId);
+        tokens.add(encoder.get(EOT_TOKEN));
         int[] out = new int[CONTEXT_LENGTH];
-        Arrays.fill(out, 0);
-        for (int i = 0; i < Math.min(out.length, ids.size()); i++) {
-            out[i] = ids.get(i);
+        Arrays.fill(out, encoder.get(EOT_TOKEN));
+        for (int i = 0; i < Math.min(out.length, tokens.size()); i++) {
+            out[i] = tokens.get(i);
         }
         return out;
     }
 
-    private List<String> wordpiece(String token) {
-        List<String> output = new ArrayList<>();
-        if (token.length() > MAX_CHARS_PER_WORD) {
-            output.add(UNK);
-            return output;
+    private List<String> bpe(String token) {
+        if (token.length() == 1) {
+            return Arrays.asList(token);
         }
-        int start = 0;
-        char[] chars = token.toCharArray();
-        while (start < chars.length) {
-            int end = chars.length;
-            String cur = null;
-            while (start < end) {
-                String substr = new String(chars, start, end - start);
-                if (start > 0) {
-                    substr = "##" + substr;
+        List<String> word = new ArrayList<>(Arrays.asList(token.split("")));
+        Set<Pair<String, String>> pairs = getPairs(word);
+        if (pairs.isEmpty()) {
+            return Arrays.asList(token);
+        }
+        while (true) {
+            Pair<String, String> bigram = null;
+            int bestRank = Integer.MAX_VALUE;
+            for (Pair<String, String> pair : pairs) {
+                Integer rank = bpeRanks.get(pair);
+                if (rank != null && rank < bestRank) {
+                    bestRank = rank;
+                    bigram = pair;
                 }
-                if (vocab.containsKey(substr)) {
-                    cur = substr;
+            }
+            if (bigram == null) {
+                break;
+            }
+            List<String> newWord = new ArrayList<>();
+            int i = 0;
+            while (i < word.size()) {
+                int j = indexOfPair(word, bigram, i);
+                if (j == -1) {
+                    newWord.addAll(word.subList(i, word.size()));
                     break;
                 }
-                end -= 1;
+                newWord.addAll(word.subList(i, j));
+                newWord.add(bigram.first + bigram.second);
+                i = j + 2;
             }
-            if (cur == null) {
-                output.add(UNK);
-                return output;
+            word = newWord;
+            if (word.size() == 1) {
+                break;
             }
-            output.add(cur);
-            start = end;
+            pairs = getPairs(word);
         }
-        return output;
+        return word;
     }
 
-    private Map<String, Integer> loadVocab(Context context) throws IOException {
-        Map<String, Integer> map = new LinkedHashMap<>();
-        try (InputStream is = context.getAssets().open(VOCAB_ASSET);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+    private int indexOfPair(List<String> word, Pair<String, String> pair, int start) {
+        for (int i = start; i < word.size() - 1; i++) {
+            if (word.get(i).equals(pair.first) && word.get(i + 1).equals(pair.second)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private Set<Pair<String, String>> getPairs(List<String> word) {
+        Set<Pair<String, String>> pairs = new LinkedHashSet<>();
+        for (int i = 0; i < word.size() - 1; i++) {
+            pairs.add(new Pair<>(word.get(i), word.get(i + 1)));
+        }
+        return pairs;
+    }
+
+    private List<String> loadMerges(Context context) throws IOException {
+        List<String> merges = new ArrayList<>();
+        try (InputStream is = context.getAssets().open(BPE_ASSET);
+             GZIPInputStream gis = new GZIPInputStream(is);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(gis, StandardCharsets.UTF_8))) {
             String line;
-            int idx = 0;
+            boolean first = true;
             while ((line = reader.readLine()) != null) {
-                String token = line.trim();
-                if (!token.isEmpty()) {
-                    map.put(token, idx++);
-                }
-            }
-        }
-        return map;
-    }
-
-    private int idFor(String token) {
-        Integer id = vocab.get(token);
-        return id != null ? id : 0;
-    }
-
-    /**
-     * Basic tokenizer: lower-case + strip accents + split punctuation and add spaces around CJK.
-     */
-    private static final class BasicTokenizer {
-        private final boolean doLowerCase;
-
-        BasicTokenizer(boolean doLowerCase) {
-            this.doLowerCase = doLowerCase;
-        }
-
-        List<String> tokenize(String text) {
-            String cleaned = cleanText(text);
-            String cjkSpaced = tokenizeChineseChars(cleaned);
-            String[] rawTokens = cjkSpaced.trim().isEmpty()
-                    ? new String[0]
-                    : cjkSpaced.trim().split("\\s+");
-            List<String> split = new ArrayList<>();
-            for (String token : rawTokens) {
-                String t = doLowerCase ? stripAccents(token.toLowerCase(Locale.getDefault())) : token;
-                split.addAll(splitOnPunc(t));
-            }
-            List<String> out = new ArrayList<>();
-            for (String s : split) {
-                if (!s.isEmpty()) {
-                    out.add(s);
-                }
-            }
-            return out;
-        }
-
-        private String cleanText(String text) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < text.length(); i++) {
-                char c = text.charAt(i);
-                int cp = c;
-                if (cp == 0 || cp == 0xfffd || isControl(c)) {
+                if (first) { // skip version line
+                    first = false;
                     continue;
                 }
-                if (isWhitespace(c)) {
-                    sb.append(' ');
-                } else {
-                    sb.append(c);
+                line = line.trim();
+                if (!line.isEmpty()) {
+                    merges.add(line);
                 }
             }
-            return sb.toString();
         }
+        return merges;
+    }
 
-        private String tokenizeChineseChars(String text) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < text.length(); i++) {
-                char c = text.charAt(i);
-                int cp = c;
-                if (isChineseChar(cp)) {
-                    sb.append(' ').append(c).append(' ');
-                } else {
-                    sb.append(c);
-                }
+    private Map<Integer, String> bytesToUnicode() {
+        Map<Integer, String> map = new LinkedHashMap<>();
+        List<Integer> bs = new ArrayList<>();
+        for (int i = '!'; i <= '~'; i++) bs.add(i);
+        for (int i = 0xA1; i <= 0xAC; i++) bs.add(i);
+        for (int i = 0xAE; i <= 0xFF; i++) bs.add(i);
+        List<Integer> cs = new ArrayList<>(bs);
+        int n = 0;
+        for (int b = 0; b < 256; b++) {
+            if (!bs.contains(b)) {
+                bs.add(b);
+                cs.add(256 + n);
+                n++;
             }
-            return sb.toString();
         }
-
-        private String stripAccents(String text) {
-            String norm = Normalizer.normalize(text, Normalizer.Form.NFD);
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < norm.length(); i++) {
-                char c = norm.charAt(i);
-                if (Character.getType(c) != Character.NON_SPACING_MARK) {
-                    sb.append(c);
-                }
-            }
-            return sb.toString();
+        for (int i = 0; i < bs.size(); i++) {
+            map.put(bs.get(i), new String(new int[]{cs.get(i)}, 0, 1));
         }
-
-        private List<String> splitOnPunc(String text) {
-            List<String> output = new ArrayList<>();
-            StringBuilder current = new StringBuilder();
-            for (int i = 0; i < text.length(); i++) {
-                char c = text.charAt(i);
-                if (isPunctuation(c)) {
-                    if (current.length() > 0) {
-                        output.add(current.toString());
-                        current.setLength(0);
-                    }
-                    output.add(String.valueOf(c));
-                } else {
-                    current.append(c);
-                }
-            }
-            if (current.length() > 0) {
-                output.add(current.toString());
-            }
-            return output;
-        }
-
-        private boolean isWhitespace(char c) {
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return true;
-            int t = Character.getType(c);
-            return t == Character.SPACE_SEPARATOR;
-        }
-
-        private boolean isControl(char c) {
-            if (c == '\t' || c == '\n' || c == '\r') return false;
-            int t = Character.getType(c);
-            return t == Character.CONTROL || t == Character.FORMAT;
-        }
-
-        private boolean isPunctuation(char c) {
-            int cp = c;
-            if ((cp >= 33 && cp <= 47) || (cp >= 58 && cp <= 64) || (cp >= 91 && cp <= 96) || (cp >= 123 && cp <= 126)) {
-                return true;
-            }
-            int t = Character.getType(c);
-            return t == Character.CONNECTOR_PUNCTUATION
-                    || t == Character.DASH_PUNCTUATION
-                    || t == Character.END_PUNCTUATION
-                    || t == Character.FINAL_QUOTE_PUNCTUATION
-                    || t == Character.INITIAL_QUOTE_PUNCTUATION
-                    || t == Character.OTHER_PUNCTUATION
-                    || t == Character.START_PUNCTUATION;
-        }
-
-        private boolean isChineseChar(int cp) {
-            return (cp >= 0x4E00 && cp <= 0x9FFF) ||
-                    (cp >= 0x3400 && cp <= 0x4DBF) ||
-                    (cp >= 0x20000 && cp <= 0x2A6DF) ||
-                    (cp >= 0x2A700 && cp <= 0x2B73F) ||
-                    (cp >= 0x2B740 && cp <= 0x2B81F) ||
-                    (cp >= 0x2B820 && cp <= 0x2CEAF) ||
-                    (cp >= 0xF900 && cp <= 0xFAFF) ||
-                    (cp >= 0x2F800 && cp <= 0x2FA1F);
-        }
+        return map;
     }
 }

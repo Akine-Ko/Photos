@@ -47,6 +47,9 @@ public class ClipEmbeddingWorker extends Worker {
 
     private int progressProcessed = 0;
     private int progressTotal = 0;
+    private int clipCount = 0;
+    private int dinoCount = 0;
+    private int faceCount = 0;
 
     public ClipEmbeddingWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
@@ -89,6 +92,7 @@ public class ClipEmbeddingWorker extends Worker {
         Log.i(TAG, "runRecent fetched=" + (latest == null ? 0 : latest.size()));
         if (isStopped()) return;
         resetProgress(latest == null ? 0 : latest.size());
+        resetCounters();
         encodeBatch(latest, featureDao, force);
         if (isStopped()) return;
         rebuildHnsw(featureDao);
@@ -96,7 +100,9 @@ public class ClipEmbeddingWorker extends Worker {
         rebuildFaceHnsw(featureDao);
         if (isStopped()) return;
         rebuildClipHnsw(featureDao);
-        Log.i(TAG, "Embedding recent done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
+        Log.i(TAG, "Embedding recent done processed=" + progressProcessed + "/" + progressTotal
+                + " clip=" + clipCount + " dino=" + dinoCount + " face=" + faceCount
+                + " stopped=" + isStopped());
     }
 
     private void runFull(PhotoDao photoDao, FeatureDao featureDao, boolean force) {
@@ -105,6 +111,7 @@ public class ClipEmbeddingWorker extends Worker {
         int total = photoDao.countAll();
         Log.i(TAG, "runFull total=" + total + " page=" + PAGE);
         resetProgress(total);
+        resetCounters();
         while (!isStopped()) {
             List<PhotoAsset> page = photoDao.queryPaged(PAGE, offset);
             if (page == null || page.isEmpty()) break;
@@ -117,7 +124,9 @@ public class ClipEmbeddingWorker extends Worker {
         rebuildFaceHnsw(featureDao);
         if (isStopped()) return;
         rebuildClipHnsw(featureDao);
-        Log.i(TAG, "Embedding full done processed=" + progressProcessed + "/" + progressTotal + " stopped=" + isStopped());
+        Log.i(TAG, "Embedding full done processed=" + progressProcessed + "/" + progressTotal
+                + " clip=" + clipCount + " dino=" + dinoCount + " face=" + faceCount
+                + " stopped=" + isStopped());
     }
 
     private void encodeBatch(List<PhotoAsset> assets, FeatureDao featureDao, boolean force) {
@@ -147,7 +156,12 @@ public class ClipEmbeddingWorker extends Worker {
             }
             if (needClip) {
                 if (isStopped()) return;
-                float[] embedding = ClipClassifier.encodeImageEmbedding(getApplicationContext(), asset);
+                float[] embedding = null;
+                try {
+                    embedding = ClipClassifier.encodeImageEmbedding(getApplicationContext(), asset);
+                } catch (Throwable t) {
+                    Log.w(TAG, "clip encode failed: " + asset.contentUri, t);
+                }
                 if (embedding != null) {
                     FeatureRecord record = new FeatureRecord();
                     record.mediaKey = asset.contentUri;
@@ -156,11 +170,17 @@ public class ClipEmbeddingWorker extends Worker {
                     record.vector = FeatureEncoding.floatsToBytes(embedding);
                     record.updatedAt = System.currentTimeMillis() / 1000L;
                     featureDao.upsert(record);
+                    clipCount++;
                 }
             }
             if (needDino) {
                 if (isStopped()) return;
-                float[] embedding = DinoImageEmbedder.encode(getApplicationContext(), asset);
+                float[] embedding = null;
+                try {
+                    embedding = DinoImageEmbedder.encode(getApplicationContext(), asset);
+                } catch (Throwable t) {
+                    Log.w(TAG, "dino encode failed: " + asset.contentUri, t);
+                }
                 if (embedding != null) {
                     FeatureRecord record = new FeatureRecord();
                     record.mediaKey = asset.contentUri;
@@ -169,6 +189,7 @@ public class ClipEmbeddingWorker extends Worker {
                     record.vector = FeatureEncoding.floatsToBytes(embedding);
                     record.updatedAt = System.currentTimeMillis() / 1000L;
                     featureDao.upsert(record);
+                    dinoCount++;
                 }
             }
             if (needFace) {
@@ -196,6 +217,7 @@ public class ClipEmbeddingWorker extends Worker {
                             r.vector = FeatureEncoding.floatsToBytes(f);
                             r.updatedAt = System.currentTimeMillis() / 1000L;
                             featureDao.upsert(r);
+                            faceCount++;
                         }
                     }
                 }
@@ -332,6 +354,12 @@ public class ClipEmbeddingWorker extends Worker {
         progressProcessed = 0;
         updateProgress();
         updateForeground(progressProcessed, progressTotal);
+    }
+
+    private void resetCounters() {
+        clipCount = 0;
+        dinoCount = 0;
+        faceCount = 0;
     }
 
     private void incrementProgress() {
