@@ -49,6 +49,25 @@ android {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
+
+    testOptions {
+        unitTests.all {
+            testLogging {
+                events "passed", "skipped", "failed"
+                showStandardStreams = true // 输出 System.out/System.err
+            }
+        }
+    }
+}
+
+configurations {
+    // 桌面 JVM 单元测试不需要 Android 版 ORT，避免加载安卓 SO。
+    testImplementation {
+        exclude group: 'com.microsoft.onnxruntime', module: 'onnxruntime-android'
+    }
+    testRuntimeOnly {
+        exclude group: 'com.microsoft.onnxruntime', module: 'onnxruntime-android'
+    }
 }
 
 
@@ -93,8 +112,17 @@ dependencies {
     // ANN index (HNSW) for vector search
     implementation 'com.github.jelmerk:hnswlib-core:1.1.0'
 
+    // SentencePiece (pure Java) for Opus-MT translation
+    implementation "io.github.eix128:sentencepiece4j:1.0.2"
+
     testImplementation 'junit:junit:4.13.2'
+    // JVM 直连 ONNX Runtime（桌面本机库），便于本机跑翻译冒烟测试
+    testImplementation 'com.microsoft.onnxruntime:onnxruntime:1.20.0'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
 

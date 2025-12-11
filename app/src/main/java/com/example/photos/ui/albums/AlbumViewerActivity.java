@@ -19,6 +19,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -163,6 +164,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
         thumbRecyclerView.setAdapter(thumbAdapter);
         updateThumbSelection();
         pager.setOnClickListener(v -> toggleChrome());
+
+        // Predictive back support: route system back gesture to our finish logic.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                finishWithResult();
+            }
+        });
     }
 
     @Override
@@ -172,11 +181,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (topBar != null) topBar.setVisibility(View.VISIBLE);
         if (bottomPanel != null) bottomPanel.setVisibility(View.VISIBLE);
         updateSystemBars(true, findViewById(R.id.albumViewerRoot));
-    }
-
-    @Override
-    public void onBackPressed() {
-        finishWithResult();
     }
 
     private void updateCounter() {

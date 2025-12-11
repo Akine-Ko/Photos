@@ -37,7 +37,18 @@ public final class TextSearchEngine {
 
     public static List<SearchResult> search(Context context, String query, int limit) {
         String prepared = query == null ? "" : query.trim();
-        float[] textEmbedding = ClipTextEncoder.encode(context, prepared);
+        String translated = prepared;
+        try {
+            OnnxZhEnTranslator translator = OnnxZhEnTranslator.getInstance(context);
+            if (translator != null) {
+                translated = translator.translate(prepared);
+            }
+        } catch (Throwable t) {
+            android.util.Log.w(TAG, "Translator unavailable, fallback to raw text", t);
+            translated = prepared;
+        }
+        android.util.Log.i(TAG, "text search: raw=\"" + prepared + "\" translated=\"" + translated + "\"");
+        float[] textEmbedding = ClipTextEncoder.encode(context, translated);
         if (textEmbedding == null) {
             android.util.Log.w(TAG, "textEmbedding is null");
             return Collections.emptyList();

@@ -29,14 +29,15 @@ import java.util.zip.GZIPInputStream;
 final class ClipTextTokenizer {
 
     private static final int CONTEXT_LENGTH = 77;
-    private static final String BPE_ASSET = "models/clip/bpe_simple_vocab_16e6.txt.gz";
+    private static final String BPE_ASSET_GZ = "models/clip/bpe_simple_vocab_16e6.txt.gz";
+    private static final String BPE_ASSET_TXT = "models/clip/bpe_simple_vocab_16e6.txt";
     private static final String SOT_TOKEN = "<|startoftext|>";
     private static final String EOT_TOKEN = "<|endoftext|>";
 
     private final Map<String, Integer> encoder;
     private final Map<Pair<String, String>, Integer> bpeRanks;
-    private final Pattern pat = Pattern.compile("'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+",
-            Pattern.UNICODE_CHARACTER_CLASS);
+    // Java 正则默认就是 Unicode 感知，去掉 UNICODE_CHARACTER_CLASS 以兼容部分设备上的实现。
+    private final Pattern pat = Pattern.compile("'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+");
 
     ClipTextTokenizer(Context context) throws IOException {
         List<String> merges = loadMerges(context);
@@ -158,9 +159,19 @@ final class ClipTextTokenizer {
 
     private List<String> loadMerges(Context context) throws IOException {
         List<String> merges = new ArrayList<>();
-        try (InputStream is = context.getAssets().open(BPE_ASSET);
-             GZIPInputStream gis = new GZIPInputStream(is);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(gis, StandardCharsets.UTF_8))) {
+        InputStream raw = null;
+        boolean gzip = false;
+        try {
+            raw = context.getAssets().open(BPE_ASSET_GZ);
+            gzip = true;
+        } catch (IOException ignore) {
+            raw = context.getAssets().open(BPE_ASSET_TXT);
+            gzip = false;
+        }
+
+        try (InputStream is = raw;
+             InputStream wrapped = gzip ? new GZIPInputStream(is) : is;
+             BufferedReader reader = new BufferedReader(new InputStreamReader(wrapped, StandardCharsets.UTF_8))) {
             String line;
             boolean first = true;
             while ((line = reader.readLine()) != null) {

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -44,6 +45,24 @@ public final class ClipClassifier {
     private static final String DEFAULT_MODEL_EXT_ASSET = "models/clip/vit-b-16.img.fp16.onnx.extra_file";
     private static final String LABELS_ASSET = "models/clip/category_keys.txt";
     private static final String CONFIG_ASSET = "models/clip/config.json";
+    // Prompts aligned with tools/export_prompts.py
+    private static final LinkedHashMap<String, String> LABEL_PROMPTS = new LinkedHashMap<>();
+    static {
+        LABEL_PROMPTS.put("SELFIE", "a close up selfie portrait of one person facing the camera with no printed text overlay");
+        LABEL_PROMPTS.put("GROUP", "a group photo of several friends taking a selfie together");
+        LABEL_PROMPTS.put("IDPHOTO", "an official passport style id portrait with a plain background");
+        LABEL_PROMPTS.put("DRAWING", "an illustration, a manga style drawing or a hand drawing without printed text");
+        LABEL_PROMPTS.put("CARD", "close up photo of bank cards or id cards");
+        LABEL_PROMPTS.put("QRCODE", "image showing a large qr code or barcode on paper or a phone screen");
+        LABEL_PROMPTS.put("NATURE", "a natural landscape photo showing mountains rivers or forests under bright daylight");
+        LABEL_PROMPTS.put("PLANTS", "close up photo focusing on vibrant plants flowers or leaves");
+        LABEL_PROMPTS.put("VEHICLES", "photo highlighting modern transportation vehicles such as cars trains airplanes or bikes");
+        LABEL_PROMPTS.put("ARCHITECTURE", "photo showcasing architectural exteriors such as landmark buildings city skylines monuments or modern facades");
+        LABEL_PROMPTS.put("PETS", "cute pet portrait featuring cats dogs or other domestic animals");
+        LABEL_PROMPTS.put("ELECTRONICS", "photo focusing on modern electronic devices such as smartphones tablets laptops or gaming consoles");
+        LABEL_PROMPTS.put("FOOD", "close up photo of delicious cooked food desserts or drinks on a table");
+        LABEL_PROMPTS.put("TEXT", "a text photo or a messaging screenshot mostly filled with text or forms");
+    }
 
     private static final Object LOCK = new Object();
 
@@ -86,8 +105,8 @@ public final class ClipClassifier {
                 initFailed = false;
                 AssetManager am = context.getAssets();
                 loadConfig(am);
-                List<String> loadedLabels = loadLabels(am, LABELS_ASSET);
-                labels = loadedLabels;
+                // Always use fixed label set (matches export_prompts.py)
+                labels = new ArrayList<>(LABEL_PROMPTS.keySet());
                 ClipTextEncoder.setModelAssets(textModelAsset, textModelDataAsset);
 
                 float[] precomputed = loadEmbeddings(am, "models/clip/text_embeds_f32.bin");
@@ -98,10 +117,12 @@ public final class ClipClassifier {
                     embeddingDim = precomputed.length / labels.size();
                     labelEmbeddings = precomputed;
                 } else {
-                    List<String> finalLabels = new ArrayList<>();
                     List<float[]> labelVecs = new ArrayList<>();
-                    for (String label : loadedLabels) {
-                        float[] emb = ClipTextEncoder.encode(context, label);
+                    List<String> finalLabels = new ArrayList<>();
+                    for (String label : labels) {
+                        String prompt = LABEL_PROMPTS.get(label);
+                        if (prompt == null) prompt = label;
+                        float[] emb = ClipTextEncoder.encode(context, prompt);
                         if (emb == null) {
                             Log.w(TAG, "Skip label embed: " + label);
                             continue;
@@ -328,20 +349,8 @@ public final class ClipClassifier {
     }
 
     private static List<String> loadLabels(AssetManager am, String assetName) {
-        List<String> out = new ArrayList<>();
-        try (InputStream is = am.open(assetName)) {
-            String[] lines = new String(readAll(is), java.nio.charset.StandardCharsets.UTF_8)
-                    .split("\\r?\\n");
-            for (String line : lines) {
-                String trimmed = line == null ? "" : line.trim();
-                if (!trimmed.isEmpty()) {
-                    out.add(trimmed.toUpperCase(Locale.US));
-                }
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to load labels: " + t);
-        }
-        return out;
+        // Not used anymore; labels come from LABEL_PROMPTS. Kept for compatibility if needed later.
+        return new ArrayList<>(LABEL_PROMPTS.keySet());
     }
 
     private static void l2Normalize(float[] vector, int off, int len) {
