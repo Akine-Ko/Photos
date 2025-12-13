@@ -3,302 +3,239 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="20dp"
-    android:foreground="?attr/selectableItemBackground">
+    android:padding="0dp"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_horizontal|bottom">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center">
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:layout_gravity="center_horizontal|bottom"
+        android:paddingLeft="16dp"
+        android:paddingRight="8dp"
+        android:paddingBottom="12dp">
 
-        <com.google.android.material.card.MaterialCardView
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="20dp"
-            app:cardBackgroundColor="#F7F7FA"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="10dp"
-            app:strokeColor="#08000000"
-            app:strokeWidth="1dp">
+            android:layout_height="match_parent"
+            android:gravity="center_horizontal|bottom">
 
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:divider="?android:attr/dividerHorizontal"
-                android:showDividers="middle"
-                android:dividerPadding="16dp">
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingLeft="32dp"
+                android:paddingRight="24dp"
+                android:paddingTop="36dp"
+                android:paddingBottom="32dp"
+                android:minHeight="440dp"
+                app:cardBackgroundColor="#EEFFFFFF"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="12dp"
+                app:strokeColor="#08000000"
+                app:strokeWidth="0dp"
+                android:layout_marginBottom="48dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelName"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/info_label_name"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/infoName"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:includeFontPadding="false" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelDate"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/info_label_time"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/infoDate"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="16sp"
-                        android:includeFontPadding="false" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelSize"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/info_label_size"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/infoSize"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="16sp"
-                        android:includeFontPadding="false"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelCamera"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/info_label_params"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/infoCamera"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="16sp"
-                        android:includeFontPadding="false"
-                        android:maxLines="2"
-                        android:ellipsize="end" />
-                </LinearLayout>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/infoExposureCard"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="2dp"
-                    app:cardBackgroundColor="#F1F1F5"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="#1A000000"
-                    app:strokeWidth="1dp">
+                    android:orientation="vertical"
+                    android:padding="2dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="12dp">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="18dp"
+                        android:layout_marginBottom="12dp">
 
                         <TextView
-                            android:id="@+id/infoLabelExposure"
+                            android:id="@+id/infoLabelName"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/info_label_exposure"
-                            android:textColor="#7A7A7A"
+                            android:text="@string/info_label_name"
+                            android:textColor="#8A8A8A"
                             android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
                             android:includeFontPadding="false" />
 
-                        <ImageView
-                            android:id="@+id/infoHistogram"
-                            android:layout_width="match_parent"
-                            android:layout_height="80dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
-                            android:scaleType="centerCrop"
-                            android:background="@drawable/bg_info_histogram" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
+                        <TextView
+                            android:id="@+id/infoName"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:weightSum="5"
-                            android:layout_marginTop="4dp">
-
-                            <TextView
-                                android:id="@+id/infoFocal"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:gravity="center_horizontal"
-                                android:includeFontPadding="false" />
-
-                            <TextView
-                                android:id="@+id/infoAperture"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:gravity="center_horizontal"
-                                android:includeFontPadding="false" />
-
-                            <TextView
-                                android:id="@+id/infoShutter"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:gravity="center_horizontal"
-                                android:includeFontPadding="false" />
-
-                            <TextView
-                                android:id="@+id/infoIso"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:gravity="center_horizontal"
-                                android:includeFontPadding="false" />
-
-                            <TextView
-                                android:id="@+id/infoEv"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:gravity="center_horizontal"
-                                android:includeFontPadding="false" />
-                        </LinearLayout>
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:maxLines="1"
+                            android:ellipsize="end"
+                            android:includeFontPadding="false" />
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelPath"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/info_label_path"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
 
-                    <TextView
-                        android:id="@+id/infoPath"
-                        android:layout_width="0dp"
+                        <TextView
+                            android:id="@+id/infoLabelDate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_time"
+                            android:textColor="#8A8A8A"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/infoDate"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="16sp"
-                        android:includeFontPadding="false"
-                        android:maxLines="2"
-                        android:ellipsize="middle" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:id="@+id/infoLabelSize"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_size"
+                            android:textColor="#8A8A8A"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/infoSize"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:id="@+id/infoLabelCamera"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_params"
+                            android:textColor="#8A8A8A"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/infoCamera"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false"
+                            android:maxLines="2"
+                            android:ellipsize="end" />
+                    </LinearLayout>
+
+                    <!-- Exposure block removed per request -->
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:id="@+id/infoLabelPath"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_path"
+                            android:textColor="#8A8A8A"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/infoPath"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false"
+                            android:maxLines="2"
+                            android:ellipsize="middle" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:id="@+id/infoLabelLocation"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/info_label_location"
+                            android:textColor="#8A8A8A"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="14dp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/infoLocation"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="#202124"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false"
+                            android:maxLines="2"
+                            android:ellipsize="end" />
+                    </LinearLayout>
+
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/infoLabelLocation"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/info_label_location"
-                        android:textColor="#7A7A7A"
-                        android:textSize="15sp"
-                        android:layout_marginEnd="12dp"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/infoLocation"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#1A1A1A"
-                        android:textSize="16sp"
-                        android:includeFontPadding="false"
-                        android:maxLines="2"
-                        android:ellipsize="end" />
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-    </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </ScrollView>
 
 </FrameLayout>

@@ -3,12 +3,12 @@ package com.example.photos.ui.albums;
 import android.app.PendingIntent;
 import android.app.RecoverableSecurityException;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.database.Cursor;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.LayoutInflater;
@@ -218,29 +218,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
         TextView dateView = dialogView.findViewById(R.id.infoDate);
         TextView sizeView = dialogView.findViewById(R.id.infoSize);
         TextView cameraView = dialogView.findViewById(R.id.infoCamera);
-        TextView focalView = dialogView.findViewById(R.id.infoFocal);
-        TextView apertureView = dialogView.findViewById(R.id.infoAperture);
-        TextView shutterView = dialogView.findViewById(R.id.infoShutter);
-        TextView isoView = dialogView.findViewById(R.id.infoIso);
-        TextView evView = dialogView.findViewById(R.id.infoEv);
         TextView pathView = dialogView.findViewById(R.id.infoPath);
         TextView locationView = dialogView.findViewById(R.id.infoLocation);
-        View exposureCard = dialogView.findViewById(R.id.infoExposureCard);
 
         if (nameView != null) nameView.setText(nonNull(info.displayName, getString(R.string.app_name)));
         if (dateView != null) dateView.setText(info.displayDate());
         if (sizeView != null) sizeView.setText(info.sizeAndResolution());
         if (cameraView != null) cameraView.setText(info.cameraText());
-        if (focalView != null) focalView.setText(info.focalLengthText());
-        if (apertureView != null) apertureView.setText(info.apertureText());
-        if (shutterView != null) shutterView.setText(info.shutterText());
-        if (isoView != null) isoView.setText(info.isoText());
-        if (evView != null) evView.setText(info.evText());
         if (pathView != null) pathView.setText(nonNull(info.path, entry.url));
         if (locationView != null) locationView.setText(info.locationText());
-        if (exposureCard != null) {
-            exposureCard.setVisibility(info.hasExposureInfo() ? View.VISIBLE : View.GONE);
-        }
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
@@ -263,7 +249,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
                         MediaStore.MediaColumns.SIZE,
                         MediaStore.MediaColumns.WIDTH,
                         MediaStore.MediaColumns.HEIGHT,
-                        MediaStore.MediaColumns.DATE_MODIFIED},
+                        MediaStore.MediaColumns.DATE_MODIFIED,
+                        MediaStore.Images.ImageColumns.LATITUDE,
+                        MediaStore.Images.ImageColumns.LONGITUDE},
                 null, null, null)) {
             if (c != null && c.moveToFirst()) {
                 int idxName = c.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
@@ -271,14 +259,18 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 int idxW = c.getColumnIndex(MediaStore.MediaColumns.WIDTH);
                 int idxH = c.getColumnIndex(MediaStore.MediaColumns.HEIGHT);
                 int idxDate = c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
+                int idxLat = c.getColumnIndex(MediaStore.Images.ImageColumns.LATITUDE);
+                int idxLong = c.getColumnIndex(MediaStore.Images.ImageColumns.LONGITUDE);
                 if (idxName >= 0 && !c.isNull(idxName)) info.displayName = c.getString(idxName);
                 if (idxSize >= 0 && !c.isNull(idxSize)) info.sizeBytes = c.getLong(idxSize);
                 if (idxW >= 0 && !c.isNull(idxW)) info.width = c.getInt(idxW);
                 if (idxH >= 0 && !c.isNull(idxH)) info.height = c.getInt(idxH);
                 if (idxDate >= 0 && !c.isNull(idxDate)) {
                     long ts = c.getLong(idxDate) * 1000L;
-                    info.dateText = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(ts));
+                    info.dateText = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(ts));
                 }
+                if (idxLat >= 0 && !c.isNull(idxLat)) info.latitude = (float) c.getDouble(idxLat);
+                if (idxLong >= 0 && !c.isNull(idxLong)) info.longitude = (float) c.getDouble(idxLong);
             }
         } catch (Exception ignored) {
         }
@@ -752,7 +744,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         float longitude = Float.NaN;
 
         String prettySize() {
-            if (sizeBytes <= 0) return "--";
+            if (sizeBytes <= 0) return "";
             double mb = sizeBytes / (1024.0 * 1024.0);
             if (mb >= 1) return String.format(java.util.Locale.getDefault(), "%.2f MB", mb);
             double kb = sizeBytes / 1024.0;
@@ -765,7 +757,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             if (!size.isEmpty() && !resolution.isEmpty()) return size + "  " + resolution;
             if (!size.isEmpty()) return size;
             if (!resolution.isEmpty()) return resolution;
-            return "--";
+            return "未知";
         }
 
         String displayDate() {
@@ -802,7 +794,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 if (sb.length() > 0) sb.append(", ");
                 sb.append(cameraMake.trim());
             }
-            return sb.length() == 0 ? "--" : sb.toString();
+            return sb.length() == 0 ? "无相机信息" : sb.toString();
         }
 
         String focalLengthText() {
@@ -830,11 +822,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
 
         String isoText() {
-            return iso > 0 ? "ISO " + iso : "--";
+            return iso > 0 ? "ISO " + iso : "";
         }
 
         String evText() {
-            if (!isKnown(exposureBiasEv)) return "--";
+            if (!isKnown(exposureBiasEv)) return "";
             return "EV " + trimTrailingZeros(exposureBiasEv);
         }
 
@@ -850,7 +842,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             if (hasLatLong()) {
                 return String.format(java.util.Locale.getDefault(), "%.5f, %.5f", latitude, longitude);
             }
-            return "--";
+            return "无位置信息";
         }
 
         private String trimTrailingZeros(double value) {
