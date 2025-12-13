@@ -1,7 +1,7 @@
 package com.example.photos.search;
 
 import android.content.Context;
-import android.util.Pair;
+import androidx.core.text.HtmlCompat;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,8 +10,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,179 +21,207 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 /**
- * OpenCLIP simple tokenizer (context length 77) for MobileCLIP2.
- * <p>
- * Ported from OpenAI CLIP simple_tokenizer.py and OpenCLIP. Uses merges from
- * assets/models/clip/bpe_simple_vocab_16e6.txt.gz.
+ * Minimal port of OpenCLIP SimpleTokenizer so we can encode arbitrary text on-device.
  */
 final class ClipTextTokenizer {
 
     private static final int CONTEXT_LENGTH = 77;
-    private static final String BPE_ASSET_GZ = "models/clip/bpe_simple_vocab_16e6.txt.gz";
-    private static final String BPE_ASSET_TXT = "models/clip/bpe_simple_vocab_16e6.txt";
-    private static final String SOT_TOKEN = "<|startoftext|>";
-    private static final String EOT_TOKEN = "<|endoftext|>";
+    private static final String VOCAB_ASSET_GZ = "models/clip/bpe_simple_vocab_16e6.txt.gz";
+    private static final String VOCAB_ASSET_TXT = "models/clip/bpe_simple_vocab_16e6.txt";
 
+    private final Map<Integer, String> byteEncoder;
     private final Map<String, Integer> encoder;
-    private final Map<Pair<String, String>, Integer> bpeRanks;
-    // Java 正则默认就是 Unicode 感知，去掉 UNICODE_CHARACTER_CLASS 以兼容部分设备上的实现。
-    private final Pattern pat = Pattern.compile("'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+");
+    private final Map<String, Integer> bpeRanks;
+    private final Map<String, String> cache = new HashMap<>();
+    private final Pattern tokenPattern;
+    private final int sotTokenId;
+    private final int eotTokenId;
 
     ClipTextTokenizer(Context context) throws IOException {
-        List<String> merges = loadMerges(context);
-        Map<Integer, String> byteEncoder = bytesToUnicode();
-        Map<String, Integer> byteDecoder = new LinkedHashMap<>();
-        for (Map.Entry<Integer, String> e : byteEncoder.entrySet()) {
-            byteDecoder.put(e.getValue(), e.getKey());
+        this.byteEncoder = bytesToUnicode();
+        Map<String, Integer> byteDecoder = new HashMap<>();
+        for (Map.Entry<Integer, String> entry : byteEncoder.entrySet()) {
+            byteDecoder.put(entry.getValue(), entry.getKey());
         }
+        List<String[]> merges = loadMerges(context);
         List<String> vocab = new ArrayList<>(byteEncoder.values());
-        List<Pair<String, String>> mergesPairs = new ArrayList<>();
-        for (String merge : merges) {
-            String[] parts = merge.split(" ");
-            if (parts.length == 2) {
-                mergesPairs.add(new Pair<>(parts[0], parts[1]));
-            }
+        List<String> suffixes = new ArrayList<>(vocab.size());
+        for (String v : vocab) {
+            suffixes.add(v + "</w>");
         }
-        for (Pair<String, String> p : mergesPairs) {
-            vocab.add(p.first + p.second);
+        vocab.addAll(suffixes);
+        for (String[] merge : merges) {
+            vocab.add(merge[0] + merge[1]);
         }
-        vocab.add(SOT_TOKEN);
-        vocab.add(EOT_TOKEN);
-        encoder = new LinkedHashMap<>();
+        List<String> specialTokens = Arrays.asList("<start_of_text>", "<end_of_text>");
+        vocab.addAll(specialTokens);
+        this.encoder = new HashMap<>();
         for (int i = 0; i < vocab.size(); i++) {
             encoder.put(vocab.get(i), i);
         }
-        bpeRanks = new LinkedHashMap<>();
-        for (int i = 0; i < mergesPairs.size(); i++) {
-            bpeRanks.put(mergesPairs.get(i), i);
+        this.bpeRanks = new HashMap<>();
+        for (int i = 0; i < merges.size(); i++) {
+            String[] merge = merges.get(i);
+            bpeRanks.put(merge[0] + "\u0000" + merge[1], i);
         }
+        this.sotTokenId = encoder.get("<start_of_text>");
+        this.eotTokenId = encoder.get("<end_of_text>");
+        StringBuilder specialPattern = new StringBuilder();
+        for (int i = 0; i < specialTokens.size(); i++) {
+            if (i > 0) specialPattern.append("|");
+            specialPattern.append(Pattern.quote(specialTokens.get(i)));
+        }
+        String pat = specialPattern + "|'s|'t|'re|'ve|'m|'ll|'d|[\\p{L}]+|[\\p{N}]|[^\\s\\p{L}\\p{N}]+";
+        this.tokenPattern = Pattern.compile(pat, Pattern.CASE_INSENSITIVE);
     }
 
     int[] tokenize(String text) {
-        if (text == null) text = "";
+        String cleaned = clean(text);
         List<Integer> tokens = new ArrayList<>();
-        tokens.add(encoder.get(SOT_TOKEN));
-        Matcher m = pat.matcher(text);
-        while (m.find()) {
-            String tok = m.group();
-            byte[] utf8 = tok.getBytes(StandardCharsets.UTF_8);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : utf8) {
-                sb.append(bytesToUnicode().get(b & 0xFF));
+        tokens.add(sotTokenId);
+        Matcher matcher = tokenPattern.matcher(cleaned);
+        while (matcher.find()) {
+            String token = matcher.group();
+            String[] bpeTokens = encodeToken(token);
+            for (String bpeToken : bpeTokens) {
+                Integer id = encoder.get(bpeToken);
+                if (id != null) {
+                    tokens.add(id);
+                }
             }
-            List<String> bpeTokens = bpe(sb.toString());
-            for (String bpeTok : bpeTokens) {
-                Integer id = encoder.get(bpeTok);
-                if (id != null) tokens.add(id);
-            }
-            if (tokens.size() >= CONTEXT_LENGTH - 1) break;
         }
-        tokens.add(encoder.get(EOT_TOKEN));
+        tokens.add(eotTokenId);
         int[] out = new int[CONTEXT_LENGTH];
-        Arrays.fill(out, encoder.get(EOT_TOKEN));
+        Arrays.fill(out, 0);
         for (int i = 0; i < Math.min(out.length, tokens.size()); i++) {
             out[i] = tokens.get(i);
         }
         return out;
     }
 
-    private List<String> bpe(String token) {
-        if (token.length() == 1) {
-            return Arrays.asList(token);
+    private String[] encodeToken(String token) {
+        if (cache.containsKey(token)) {
+            return cache.get(token).split(" ");
         }
-        List<String> word = new ArrayList<>(Arrays.asList(token.split("")));
-        Set<Pair<String, String>> pairs = getPairs(word);
+        byte[] tokenBytes = token.getBytes(StandardCharsets.UTF_8);
+        StringBuilder transformed = new StringBuilder();
+        for (byte b : tokenBytes) {
+            String mapped = byteEncoder.get((int) (b & 0xFF));
+            transformed.append(mapped);
+        }
+        String bpeTokens = bpe(transformed.toString());
+        cache.put(token, bpeTokens);
+        return bpeTokens.split(" ");
+    }
+
+    private String bpe(String token) {
+        List<String> word = new ArrayList<>();
+        for (int i = 0; i < token.length(); i++) {
+            word.add(String.valueOf(token.charAt(i)));
+        }
+        if (!word.isEmpty()) {
+            String last = word.remove(word.size() - 1) + "</w>";
+            word.add(last);
+        }
+        Set<String> pairs = getPairs(word);
         if (pairs.isEmpty()) {
-            return Arrays.asList(token);
+            return token + "</w>";
         }
         while (true) {
-            Pair<String, String> bigram = null;
+            String bigram = null;
             int bestRank = Integer.MAX_VALUE;
-            for (Pair<String, String> pair : pairs) {
-                Integer rank = bpeRanks.get(pair);
+            for (String pairKey : pairs) {
+                Integer rank = bpeRanks.get(pairKey);
                 if (rank != null && rank < bestRank) {
                     bestRank = rank;
-                    bigram = pair;
+                    bigram = pairKey;
                 }
             }
             if (bigram == null) {
                 break;
             }
+            String[] parts = bigram.split("\u0000");
+            String first = parts[0];
+            String second = parts[1];
             List<String> newWord = new ArrayList<>();
             int i = 0;
             while (i < word.size()) {
-                int j = indexOfPair(word, bigram, i);
+                int j = word.subList(i, word.size()).indexOf(first);
                 if (j == -1) {
                     newWord.addAll(word.subList(i, word.size()));
                     break;
                 }
+                j += i;
                 newWord.addAll(word.subList(i, j));
-                newWord.add(bigram.first + bigram.second);
-                i = j + 2;
+                if (j < word.size() - 1 && word.get(j + 1).equals(second)) {
+                    newWord.add(first + second);
+                    i = j + 2;
+                } else {
+                    newWord.add(word.get(j));
+                    i = j + 1;
+                }
             }
             word = newWord;
-            if (word.size() == 1) {
-                break;
-            }
             pairs = getPairs(word);
         }
-        return word;
-    }
-
-    private int indexOfPair(List<String> word, Pair<String, String> pair, int start) {
-        for (int i = start; i < word.size() - 1; i++) {
-            if (word.get(i).equals(pair.first) && word.get(i + 1).equals(pair.second)) {
-                return i;
-            }
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < word.size(); i++) {
+            if (i > 0) result.append(" ");
+            result.append(word.get(i));
         }
-        return -1;
+        return result.toString();
     }
 
-    private Set<Pair<String, String>> getPairs(List<String> word) {
-        Set<Pair<String, String>> pairs = new LinkedHashSet<>();
-        for (int i = 0; i < word.size() - 1; i++) {
-            pairs.add(new Pair<>(word.get(i), word.get(i + 1)));
+    private Set<String> getPairs(List<String> word) {
+        Set<String> pairs = new HashSet<>();
+        String prev = word.get(0);
+        for (int i = 1; i < word.size(); i++) {
+            String current = word.get(i);
+            pairs.add(prev + "\u0000" + current);
+            prev = current;
         }
         return pairs;
     }
 
-    private List<String> loadMerges(Context context) throws IOException {
-        List<String> merges = new ArrayList<>();
-        InputStream raw = null;
-        boolean gzip = false;
-        try {
-            raw = context.getAssets().open(BPE_ASSET_GZ);
-            gzip = true;
-        } catch (IOException ignore) {
-            raw = context.getAssets().open(BPE_ASSET_TXT);
-            gzip = false;
-        }
-
-        try (InputStream is = raw;
-             InputStream wrapped = gzip ? new GZIPInputStream(is) : is;
-             BufferedReader reader = new BufferedReader(new InputStreamReader(wrapped, StandardCharsets.UTF_8))) {
+    private List<String[]> loadMerges(Context context) throws IOException {
+        List<String[]> merges = new ArrayList<>();
+        try (InputStream raw = openVocab(context);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8))) {
             String line;
-            boolean first = true;
-            while ((line = reader.readLine()) != null) {
-                if (first) { // skip version line
-                    first = false;
+            boolean firstLine = true;
+            // Stop early so tokenizer vocab aligns with model embedding rows (49408).
+            int target = 48894;
+            while ((line = reader.readLine()) != null && merges.size() < target) {
+                if (firstLine) {
+                    firstLine = false;
                     continue;
                 }
                 line = line.trim();
-                if (!line.isEmpty()) {
-                    merges.add(line);
+                if (line.isEmpty()) continue;
+                String[] parts = line.split(" ");
+                if (parts.length == 2) {
+                    merges.add(parts);
                 }
             }
         }
         return merges;
     }
 
+    private InputStream openVocab(Context context) throws IOException {
+        // Some build pipelines unpack the .gz into a plain .txt. Try gz first, then fallback.
+        try {
+            return new GZIPInputStream(context.getAssets().open(VOCAB_ASSET_GZ));
+        } catch (IOException notGz) {
+            return context.getAssets().open(VOCAB_ASSET_TXT);
+        }
+    }
+
     private Map<Integer, String> bytesToUnicode() {
-        Map<Integer, String> map = new LinkedHashMap<>();
+        Map<Integer, String> map = new HashMap<>();
         List<Integer> bs = new ArrayList<>();
-        for (int i = '!'; i <= '~'; i++) bs.add(i);
-        for (int i = 0xA1; i <= 0xAC; i++) bs.add(i);
-        for (int i = 0xAE; i <= 0xFF; i++) bs.add(i);
+        for (int i = (int) '!'; i <= '~'; i++) bs.add(i);
+        for (int i = 161; i <= 172; i++) bs.add(i);
+        for (int i = 174; i <= 255; i++) bs.add(i);
         List<Integer> cs = new ArrayList<>(bs);
         int n = 0;
         for (int b = 0; b < 256; b++) {
@@ -207,5 +235,13 @@ final class ClipTextTokenizer {
             map.put(bs.get(i), new String(new int[]{cs.get(i)}, 0, 1));
         }
         return map;
+    }
+
+    private String clean(String text) {
+        if (text == null) return "";
+        CharSequence unescaped = HtmlCompat.fromHtml(text, HtmlCompat.FROM_HTML_MODE_LEGACY);
+        String basic = unescaped.toString().trim();
+        String collapsed = basic.replaceAll("\\s+", " ");
+        return collapsed.toLowerCase(Locale.getDefault());
     }
 }

@@ -1,46 +1,47 @@
 package com.example.photos.model;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Build;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 /**
- * Tracks NNAPI stability. If consecutive failures exceed threshold, future runs stay on CPU.
+ * Tracks NNAPI stability per-process. Failures disable NNAPI for the remainder of the process,
+ * but state is not persisted so future app launches will try NNAPI again.
  */
 public final class NnapiController {
-    private static final String PREF = "nnapi_prefs";
-    private static final String KEY_DISABLED_PREFIX = "disabled_";
-    private static final String KEY_FAIL_PREFIX = "fail_";
     private static final int FAIL_THRESHOLD = 2;
+    private static final Map<String, Integer> failCounts = new HashMap<>();
+    private static final Set<String> disabledKeys = new HashSet<>();
 
     private NnapiController() {}
 
     public static boolean shouldUseNnapi(Context ctx, String key) {
         if (Build.VERSION.SDK_INT < 27) return false;
-        SharedPreferences sp = prefs(ctx);
-        return !sp.getBoolean(KEY_DISABLED_PREFIX + key, false);
+        synchronized (NnapiController.class) {
+            return !disabledKeys.contains(key);
+        }
     }
 
     public static void recordFailure(Context ctx, String key) {
-        SharedPreferences sp = prefs(ctx);
-        int fails = sp.getInt(KEY_FAIL_PREFIX + key, 0) + 1;
-        SharedPreferences.Editor e = sp.edit();
-        e.putInt(KEY_FAIL_PREFIX + key, fails);
-        if (fails >= FAIL_THRESHOLD) {
-            e.putBoolean(KEY_DISABLED_PREFIX + key, true);
+        synchronized (NnapiController.class) {
+            int fails = failCounts.getOrDefault(key, 0) + 1;
+            failCounts.put(key, fails);
+            if (fails >= FAIL_THRESHOLD) {
+                disabledKeys.add(key);
+            }
         }
-        e.apply();
     }
 
     public static void recordSuccess(Context ctx, String key) {
-        SharedPreferences sp = prefs(ctx);
-        if (sp.getBoolean(KEY_DISABLED_PREFIX + key, false)) {
-            return; // stay disabled until user clears data
+        synchronized (NnapiController.class) {
+            if (disabledKeys.contains(key)) {
+                return; // stay disabled for the rest of this process
+            }
+            failCounts.remove(key);
         }
-        sp.edit().putInt(KEY_FAIL_PREFIX + key, 0).apply();
-    }
-
-    private static SharedPreferences prefs(Context ctx) {
-        return ctx.getApplicationContext().getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
 }

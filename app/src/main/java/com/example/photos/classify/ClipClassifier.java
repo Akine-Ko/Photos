@@ -8,8 +8,6 @@ import android.net.Uri;
 import android.util.Log;
 
 import com.example.photos.db.PhotoAsset;
-import com.example.photos.model.NnapiController;
-import com.example.photos.search.ClipTextEncoder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -35,34 +32,17 @@ import ai.onnxruntime.OrtSession;
 /**
  * Minimal CLIP image encoder wrapper for smart classification.
  * <p>
- * Loads a Chinese-CLIP ViT-B/16 image encoder (ONNX/ORT) and computes label embeddings on-device.
- * Classification is cosine similarity between the image embedding and label embeddings.
+ * Loads a MobileCLIP2 image encoder exported to ONNX together with fixed text embeddings.
+ * Classification is cosine similarity between the image embedding and precomputed text embeddings.
  */
 public final class ClipClassifier {
 
     private static final String TAG = "ClipClassifier";
-    private static final String DEFAULT_MODEL_ASSET = "models/clip/vit-b-16.img.fp16.onnx";
-    private static final String DEFAULT_MODEL_EXT_ASSET = "models/clip/vit-b-16.img.fp16.onnx.extra_file";
+    private static final String DEFAULT_MODEL_ASSET = "models/clip/image_encoder.onnx";
+    private static final String DEFAULT_MODEL_EXT_ASSET = "models/clip/image_encoder.onnx.data";
     private static final String LABELS_ASSET = "models/clip/category_keys.txt";
+    private static final String TEXT_EMBED_ASSET = "models/clip/text_embeds_f32.bin";
     private static final String CONFIG_ASSET = "models/clip/config.json";
-    // Prompts aligned with tools/export_prompts.py
-    private static final LinkedHashMap<String, String> LABEL_PROMPTS = new LinkedHashMap<>();
-    static {
-        LABEL_PROMPTS.put("SELFIE", "a close up selfie portrait of one person facing the camera with no printed text overlay");
-        LABEL_PROMPTS.put("GROUP", "a group photo of several friends taking a selfie together");
-        LABEL_PROMPTS.put("IDPHOTO", "an official passport style id portrait with a plain background");
-        LABEL_PROMPTS.put("DRAWING", "an illustration, a manga style drawing or a hand drawing without printed text");
-        LABEL_PROMPTS.put("CARD", "close up photo of bank cards or id cards");
-        LABEL_PROMPTS.put("QRCODE", "image showing a large qr code or barcode on paper or a phone screen");
-        LABEL_PROMPTS.put("NATURE", "a natural landscape photo showing mountains rivers or forests under bright daylight");
-        LABEL_PROMPTS.put("PLANTS", "close up photo focusing on vibrant plants flowers or leaves");
-        LABEL_PROMPTS.put("VEHICLES", "photo highlighting modern transportation vehicles such as cars trains airplanes or bikes");
-        LABEL_PROMPTS.put("ARCHITECTURE", "photo showcasing architectural exteriors such as landmark buildings city skylines monuments or modern facades");
-        LABEL_PROMPTS.put("PETS", "cute pet portrait featuring cats dogs or other domestic animals");
-        LABEL_PROMPTS.put("ELECTRONICS", "photo focusing on modern electronic devices such as smartphones tablets laptops or gaming consoles");
-        LABEL_PROMPTS.put("FOOD", "close up photo of delicious cooked food desserts or drinks on a table");
-        LABEL_PROMPTS.put("TEXT", "a text photo or a messaging screenshot mostly filled with text or forms");
-    }
 
     private static final Object LOCK = new Object();
 
@@ -70,10 +50,8 @@ public final class ClipClassifier {
     private static volatile boolean initFailed = false;
     private static OrtEnvironment env;
     private static OrtSession session;
-    private static boolean usingNnapi = false;
-    private static String cachedModelPath;
     private static List<String> labels = new ArrayList<>();
-    private static float[] labelEmbeddings;
+    private static float[] textEmbeddings;
     private static int embeddingDim = 0;
     private static int inputSize = 224;
     private static float[] mean = new float[]{0.48145466f, 0.4578275f, 0.40821073f};
@@ -81,9 +59,7 @@ public final class ClipClassifier {
     private static String inputName = "images";
     private static String modelAsset = DEFAULT_MODEL_ASSET;
     private static String modelExtAsset = DEFAULT_MODEL_EXT_ASSET;
-    private static String textModelAsset = "models/clip/vit-b-16.txt.fp16.onnx";
-    private static String textModelDataAsset = null;
-    private static final float DEFAULT_THRESHOLD = 0.6f;
+    private static final float DEFAULT_THRESHOLD = 0.32f;
     private static final Map<String, Float> thresholds = new HashMap<>();
 
     private ClipClassifier() {}
@@ -105,88 +81,32 @@ public final class ClipClassifier {
                 initFailed = false;
                 AssetManager am = context.getAssets();
                 loadConfig(am);
-                // Always use fixed label set (matches export_prompts.py)
-                labels = new ArrayList<>(LABEL_PROMPTS.keySet());
-                ClipTextEncoder.setModelAssets(textModelAsset, textModelDataAsset);
-
-                float[] precomputed = loadEmbeddings(am, "models/clip/text_embeds_f32.bin");
-                if (precomputed != null) {
-                    if (precomputed.length % labels.size() != 0) {
-                        throw new IllegalStateException("text_embeds size mismatch labels");
-                    }
-                    embeddingDim = precomputed.length / labels.size();
-                    labelEmbeddings = precomputed;
-                } else {
-                    List<float[]> labelVecs = new ArrayList<>();
-                    List<String> finalLabels = new ArrayList<>();
-                    for (String label : labels) {
-                        String prompt = LABEL_PROMPTS.get(label);
-                        if (prompt == null) prompt = label;
-                        float[] emb = ClipTextEncoder.encode(context, prompt);
-                        if (emb == null) {
-                            Log.w(TAG, "Skip label embed: " + label);
-                            continue;
-                        }
-                        l2Normalize(emb, 0, emb.length);
-                        finalLabels.add(label);
-                        labelVecs.add(emb);
-                    }
-                    if (labelVecs.isEmpty()) {
-                        throw new IllegalStateException("Label embeddings unavailable");
-                    }
-                    labels = finalLabels;
-                    embeddingDim = labelVecs.get(0).length;
-                    labelEmbeddings = flatten(labelVecs, embeddingDim);
+                labels = loadLabels(am, LABELS_ASSET);
+                textEmbeddings = loadEmbeddings(am, TEXT_EMBED_ASSET);
+                if (labels.isEmpty() || textEmbeddings == null) {
+                    throw new IllegalStateException("Missing labels or text embeddings");
+                }
+                if (textEmbeddings.length % labels.size() != 0) {
+                    throw new IllegalStateException("textEmbeds size mismatch labels");
+                }
+                embeddingDim = textEmbeddings.length / labels.size();
+                for (int i = 0; i < labels.size(); i++) {
+                    l2Normalize(textEmbeddings, i * embeddingDim, embeddingDim);
                 }
                 File model = copyAssetToCache(context, modelAsset, fileName(modelAsset, "image_encoder.onnx"));
                 if (model == null || !model.exists()) {
                     throw new IllegalStateException("Model asset not found. Place image_encoder.onnx in assets.");
                 }
-                if (modelExtAsset != null) {
-                    copyAssetToCache(context, modelExtAsset, fileName(modelExtAsset, "image_encoder.onnx.data"));
-                }
+                copyAssetToCache(context, modelExtAsset, fileName(modelExtAsset, "image_encoder.onnx.data"));
                 env = OrtEnvironment.getEnvironment();
-                boolean useNnapi = NnapiController.shouldUseNnapi(context, "clip_image");
-                cachedModelPath = model.getAbsolutePath();
-                session = createSession(cachedModelPath, useNnapi, context);
-                if (session == null) {
-                    throw new IllegalStateException("Session init failed");
-                }
-                NnapiController.recordSuccess(context, "clip_image");
+                session = env.createSession(model.getAbsolutePath(), new OrtSession.SessionOptions());
                 inputName = session.getInputNames().iterator().next();
                 initialized = true;
-                Log.i(TAG, "ClipClassifier initialized. labels=" + labels.size() + " embDim=" + embeddingDim
-                        + " nnapi=" + usingNnapi);
+                Log.i(TAG, "ClipClassifier initialized. labels=" + labels.size());
             } catch (Throwable t) {
                 initFailed = true;
                 Log.w(TAG, "Failed to initialize ClipClassifier: " + t);
             }
-        }
-    }
-
-    private static OrtSession createSession(String modelPath, boolean useNnapi, Context context) {
-        try {
-            OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-            if (useNnapi) {
-                opts.addNnapi();
-            }
-            OrtSession s = env.createSession(modelPath, opts);
-            usingNnapi = useNnapi;
-            return s;
-        } catch (Throwable t) {
-            Log.w(TAG, "createSession failed nnapi=" + useNnapi + " err=" + t);
-            if (useNnapi) {
-                NnapiController.recordFailure(context, "clip_image");
-                try {
-                    OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-                    OrtSession s = env.createSession(modelPath, opts);
-                    usingNnapi = false;
-                    return s;
-                } catch (Throwable ignore) {
-                    // fall through
-                }
-            }
-            return null;
         }
     }
 
@@ -205,20 +125,7 @@ public final class ClipClassifier {
             bmp = decodeAndCenterCrop(context, Uri.parse(asset.contentUri), inputSize, inputSize);
             if (bmp == null) return null;
             float[] chw = toCHWClipNormalized(bmp);
-            float[] imgEmb = null;
-            try {
-                imgEmb = runOnnx(chw);
-                NnapiController.recordSuccess(context, "clip_image");
-            } catch (Throwable t) {
-                Log.w(TAG, "runOnnx failed (clip_image) nnapi=" + usingNnapi + " err=" + t);
-                if (usingNnapi && fallbackToCpu(context)) {
-                    try {
-                        imgEmb = runOnnx(chw);
-                    } catch (Throwable t2) {
-                        Log.w(TAG, "runOnnx retry on CPU failed", t2);
-                    }
-                }
-            }
+            float[] imgEmb = runOnnx(chw);
             if (imgEmb == null) return null;
             l2Normalize(imgEmb, 0, imgEmb.length);
             return imgEmb;
@@ -242,36 +149,17 @@ public final class ClipClassifier {
 
     public static Result bestLabel(float[] embedding) {
         if (embedding == null) return null;
-        if (!initialized || labelEmbeddings == null) return null;
+        if (!initialized || textEmbeddings == null) return null;
         float bestScore = -Float.MAX_VALUE;
         String bestLabel = null;
         for (int i = 0; i < labels.size(); i++) {
-            float s = dot(embedding, labelEmbeddings, i * embeddingDim, embeddingDim);
+            float s = dot(embedding, textEmbeddings, i * embeddingDim, embeddingDim);
             if (s > bestScore) {
                 bestScore = s;
                 bestLabel = labels.get(i);
             }
         }
         return bestLabel == null ? null : new Result(bestLabel, bestScore);
-    }
-
-    private static boolean fallbackToCpu(Context context) {
-        synchronized (LOCK) {
-            if (!usingNnapi || env == null || cachedModelPath == null) {
-                return false;
-            }
-            try {
-                OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-                session = env.createSession(cachedModelPath, opts);
-                usingNnapi = false;
-                NnapiController.recordFailure(context, "clip_image");
-                Log.w(TAG, "Fallback to CPU session for clip_image");
-                return true;
-            } catch (Throwable t) {
-                Log.w(TAG, "Fallback to CPU session failed", t);
-                return false;
-            }
-        }
     }
 
     private static float[] runOnnx(float[] chw) throws Exception {
@@ -319,18 +207,6 @@ public final class ClipClassifier {
             } else {
                 modelExtAsset = DEFAULT_MODEL_EXT_ASSET;
             }
-            String textModelFile = obj.optString("text_model_file", null);
-            if (textModelFile != null && !textModelFile.isEmpty()) {
-                textModelAsset = "models/clip/" + textModelFile;
-            } else {
-                textModelAsset = "models/clip/vit-b-16.txt.fp16.onnx";
-            }
-            String textModelDataFile = obj.optString("text_model_data_file", null);
-            if (textModelDataFile != null && !textModelDataFile.isEmpty()) {
-                textModelDataAsset = "models/clip/" + textModelDataFile;
-            } else {
-                textModelDataAsset = null;
-            }
             thresholds.clear();
             JSONObject th = obj.optJSONObject("thresholds");
             if (th != null) {
@@ -349,8 +225,34 @@ public final class ClipClassifier {
     }
 
     private static List<String> loadLabels(AssetManager am, String assetName) {
-        // Not used anymore; labels come from LABEL_PROMPTS. Kept for compatibility if needed later.
-        return new ArrayList<>(LABEL_PROMPTS.keySet());
+        List<String> out = new ArrayList<>();
+        try (InputStream is = am.open(assetName)) {
+            String[] lines = new String(readAll(is), java.nio.charset.StandardCharsets.UTF_8)
+                    .split("\\r?\\n");
+            for (String line : lines) {
+                String trimmed = line == null ? "" : line.trim();
+                if (!trimmed.isEmpty()) {
+                    out.add(trimmed.toUpperCase(Locale.US));
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to load labels: " + t);
+        }
+        return out;
+    }
+
+    private static float[] loadEmbeddings(AssetManager am, String assetName) {
+        try (InputStream is = am.open(assetName)) {
+            byte[] data = readAll(is);
+            if (data == null || data.length % 4 != 0) return null;
+            FloatBuffer fb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+            float[] out = new float[fb.remaining()];
+            fb.get(out);
+            return out;
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to load embeddings: " + t);
+            return null;
+        }
     }
 
     private static void l2Normalize(float[] vector, int off, int len) {
@@ -371,31 +273,6 @@ public final class ClipClassifier {
             s += a[i] * b[bOffset + i];
         }
         return s;
-    }
-
-    private static float[] flatten(List<float[]> vectors, int dim) {
-        float[] out = new float[vectors.size() * dim];
-        int offset = 0;
-        for (float[] v : vectors) {
-            int copy = Math.min(dim, v.length);
-            System.arraycopy(v, 0, out, offset, copy);
-            offset += dim;
-        }
-        return out;
-    }
-
-    private static float[] loadEmbeddings(AssetManager am, String assetName) {
-        try (InputStream is = am.open(assetName)) {
-            byte[] data = readAll(is);
-            if (data == null || data.length % 4 != 0) return null;
-            FloatBuffer fb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
-            float[] out = new float[fb.remaining()];
-            fb.get(out);
-            return out;
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to load embeddings: " + t);
-            return null;
-        }
     }
 
     private static Bitmap decodeAndCenterCrop(Context context, Uri uri, int tw, int th) {

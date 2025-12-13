@@ -8,7 +8,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.LongBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
@@ -17,8 +19,8 @@ import ai.onnxruntime.OrtSession;
 public final class ClipTextEncoder {
 
     private static final String TAG = "ClipTextEncoder";
-    private static final String DEFAULT_MODEL_ASSET = "models/clip/vit-b-16.txt.fp16.onnx";
-    private static final String INPUT_NAME = "text";
+    private static final String MODEL_NAME = "models/clip/MobileCLIP2-S2_text_encoder.onnx";
+    private static final String MODEL_DATA_NAME = "models/clip/MobileCLIP2-S2_text_encoder.onnx.data";
 
     private static final Object LOCK = new Object();
 
@@ -26,32 +28,9 @@ public final class ClipTextEncoder {
     private static OrtEnvironment env;
     private static OrtSession session;
     private static ClipTextTokenizer tokenizer;
-    private static String modelAsset = DEFAULT_MODEL_ASSET;
-    private static String modelDataAsset = null;
+    private static String inputName = "text";
 
     private ClipTextEncoder() {}
-
-    public static void setModelAssets(String assetPath, String dataPath) {
-        synchronized (LOCK) {
-            String resolvedAsset = (assetPath == null || assetPath.trim().isEmpty())
-                    ? DEFAULT_MODEL_ASSET : assetPath;
-            String resolvedData = (dataPath != null && !dataPath.trim().isEmpty()) ? dataPath : null;
-            boolean changed = !resolvedAsset.equals(modelAsset)
-                    || ((modelDataAsset == null && resolvedData != null)
-                    || (modelDataAsset != null && !modelDataAsset.equals(resolvedData)));
-            if (changed) {
-                modelAsset = resolvedAsset;
-                modelDataAsset = resolvedData;
-                if (session != null) {
-                    try {
-                        session.close();
-                    } catch (Exception ignore) { }
-                    session = null;
-                }
-                initialized = false;
-            }
-        }
-    }
 
     public static float[] encode(Context context, String text) {
         ensureInitialized(context.getApplicationContext());
@@ -69,7 +48,7 @@ public final class ClipTextEncoder {
             }
             LongBuffer buffer = LongBuffer.wrap(input);
             OnnxTensor tensor = OnnxTensor.createTensor(env, buffer, new long[]{1, tokens.length});
-            OrtSession.Result result = session.run(Collections.singletonMap(INPUT_NAME, tensor));
+            OrtSession.Result result = session.run(Collections.singletonMap(inputName, tensor));
             float[][] value = (float[][]) result.get(0).getValue();
             float[] embedding = value != null && value.length > 0 ? value[0] : null;
             if (embedding != null) {
@@ -90,15 +69,17 @@ public final class ClipTextEncoder {
             if (initialized) return;
             try {
                 env = OrtEnvironment.getEnvironment();
-                File modelFile = copyAsset(context, modelAsset, fileName(modelAsset));
-                if (modelDataAsset != null) {
-                    copyExtraIfExists(context, modelDataAsset, fileName(modelDataAsset));
-                } else {
-                    copyExtraIfExists(context, modelAsset + ".extra_file", fileName(modelAsset + ".extra_file"));
-                }
+                File modelFile = copyAsset(context, MODEL_NAME, "MobileCLIP2-S2_text_encoder.onnx");
+                copyAsset(context, MODEL_DATA_NAME, "MobileCLIP2-S2_text_encoder.onnx.data");
                 session = env.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
                 tokenizer = new ClipTextTokenizer(context);
-                Log.i(TAG, "Text encoder initialized. inputs=" + session.getInputNames() + " outputs=" + session.getOutputNames());
+                try {
+                    List<String> names = new ArrayList<>(session.getInputNames());
+                    if (!names.isEmpty()) {
+                        inputName = names.get(0);
+                    }
+                    Log.i(TAG, "Text encoder initialized. input=" + inputName + " outputs=" + session.getOutputNames());
+                } catch (Throwable ignore) {}
                 initialized = true;
             } catch (Exception e) {
                 Log.e(TAG, "Failed to initialize text encoder", e);
@@ -131,27 +112,5 @@ public final class ClipTextEncoder {
             }
         }
         return out;
-    }
-
-    private static void copyExtraIfExists(Context context, String assetPath, String name) {
-        AssetManager am = context.getAssets();
-        try (InputStream is = am.open(assetPath); FileOutputStream fos = new FileOutputStream(new File(context.getCacheDir(), name))) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) > 0) {
-                fos.write(buf, 0, n);
-            }
-        } catch (Exception ignore) {
-            // optional extra file
-        }
-    }
-
-    private static String fileName(String assetPath) {
-        if (assetPath == null) return "model.onnx";
-        int idx = assetPath.lastIndexOf('/');
-        if (idx >= 0 && idx < assetPath.length() - 1) {
-            return assetPath.substring(idx + 1);
-        }
-        return assetPath;
     }
 }

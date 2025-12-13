@@ -11,7 +11,6 @@ import com.example.photos.db.PhotosDb;
 import com.example.photos.features.FeatureEncoding;
 import com.example.photos.features.FeatureType;
 import com.example.photos.model.Photo;
-import com.example.photos.search.HnswImageIndex;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,7 +46,6 @@ public final class TextSearchEngine {
             android.util.Log.w(TAG, "Translator unavailable, fallback to raw text", t);
             translated = prepared;
         }
-        android.util.Log.i(TAG, "text search: raw=\"" + prepared + "\" translated=\"" + translated + "\"");
         float[] textEmbedding = ClipTextEncoder.encode(context, translated);
         if (textEmbedding == null) {
             android.util.Log.w(TAG, "textEmbedding is null");
@@ -55,7 +53,34 @@ public final class TextSearchEngine {
         }
         PhotosDb db = PhotosDb.get(context.getApplicationContext());
         FeatureDao featureDao = db.featureDao();
-        List<SearchResultInternal> ordered = searchClip(featureDao, textEmbedding, limit, context);
+        List<FeatureRecord> records = featureDao.getAllByType(FeatureType.CLIP_IMAGE_EMB.getCode());
+        if (records == null || records.isEmpty()) {
+            android.util.Log.w(TAG, "No image embeddings cached");
+            return Collections.emptyList();
+        }
+        android.util.Log.i(TAG, "search query=\"" + query + "\" translated=\"" + translated + "\" textDim=" + textEmbedding.length + " vectors=" + records.size());
+        PriorityQueue<SearchResultInternal> heap = new PriorityQueue<>(limit, Comparator.comparingDouble(r -> r.score));
+        int used = 0;
+        int skippedDim = 0;
+        for (FeatureRecord record : records) {
+            if (record.vector == null || record.vector.length == 0) continue;
+            float[] imageEmb = FeatureEncoding.bytesToFloats(record.vector);
+            if (imageEmb.length != textEmbedding.length) {
+                skippedDim++;
+                continue;
+            }
+            float score = dot(textEmbedding, imageEmb);
+            if (heap.size() < limit) {
+                heap.offer(new SearchResultInternal(record.mediaKey, score));
+            } else if (score > heap.peek().score) {
+                heap.poll();
+                heap.offer(new SearchResultInternal(record.mediaKey, score));
+            }
+            used++;
+        }
+        android.util.Log.i(TAG, "processed=" + used + " skippedDim=" + skippedDim + " heap=" + heap.size());
+        List<SearchResultInternal> ordered = new ArrayList<>(heap);
+        ordered.sort((a, b) -> Float.compare(b.score, a.score));
         // Log top scores for debugging/search visibility in logcat.
         if (!ordered.isEmpty()) {
             int logCount = Math.min(5, ordered.size());
@@ -69,13 +94,10 @@ public final class TextSearchEngine {
         }
         List<SearchResult> out = new ArrayList<>();
         PhotoDao photoDao = db.photoDao();
-        int logIdx = 0;
         for (SearchResultInternal internal : ordered) {
             Photo photo = mapToPhoto(photoDao, internal.mediaKey);
             if (photo != null) {
                 out.add(new SearchResult(photo, internal.score));
-                android.util.Log.i(TAG, "result[" + logIdx + "] score=" + internal.score + " key=" + internal.mediaKey + " uri=" + photo.getImageUrl());
-                logIdx++;
             }
         }
         return out;
@@ -99,50 +121,6 @@ public final class TextSearchEngine {
         return sum;
     }
 
-    private static List<SearchResultInternal> searchClip(FeatureDao featureDao, float[] query, int limit, Context ctx) {
-        HnswImageIndex idx = new HnswImageIndex(ctx, "clip_hnsw.index");
-        List<SearchResultInternal> ordered = new ArrayList<>();
-        if (idx.loadIfExists()) {
-            var res = idx.search(query, limit);
-            for (var r : res) {
-                float score = (float) (-r.distance());
-                String key = parseMediaKey(r.item().id());
-                ordered.add(new SearchResultInternal(key, score));
-            }
-            ordered.sort((a, b) -> Float.compare(b.score, a.score));
-            android.util.Log.i(TAG, "HNSW CLIP used, got=" + ordered.size());
-            return ordered;
-        }
-        List<FeatureRecord> records = featureDao.getAllByType(FeatureType.CLIP_IMAGE_EMB.getCode());
-        if (records == null || records.isEmpty()) {
-            android.util.Log.w(TAG, "No image embeddings cached");
-            return Collections.emptyList();
-        }
-        PriorityQueue<SearchResultInternal> heap = new PriorityQueue<>(limit, Comparator.comparingDouble(r -> r.score));
-        int used = 0;
-        int skippedDim = 0;
-        for (FeatureRecord record : records) {
-            if (record.vector == null || record.vector.length == 0) continue;
-            float[] imageEmb = FeatureEncoding.bytesToFloats(record.vector);
-            if (imageEmb.length != query.length) {
-                skippedDim++;
-                continue;
-            }
-            float score = dot(query, imageEmb);
-            if (heap.size() < limit) {
-                heap.offer(new SearchResultInternal(record.mediaKey, score));
-            } else if (score > heap.peek().score) {
-                heap.poll();
-                heap.offer(new SearchResultInternal(record.mediaKey, score));
-            }
-            used++;
-        }
-        android.util.Log.i(TAG, "CLIP linear processed=" + used + " skippedDim=" + skippedDim + " heap=" + heap.size());
-        List<SearchResultInternal> linear = new ArrayList<>(heap);
-        linear.sort((a, b) -> Float.compare(b.score, a.score));
-        return linear;
-    }
-
     private static final class SearchResultInternal {
         final String mediaKey;
         final float score;
@@ -151,13 +129,5 @@ public final class TextSearchEngine {
             this.mediaKey = mediaKey;
             this.score = score;
         }
-    }
-
-    private static String parseMediaKey(String id) {
-        int pos = id.indexOf("#f");
-        if (pos > 0) {
-            return id.substring(0, pos);
-        }
-        return id;
     }
 }

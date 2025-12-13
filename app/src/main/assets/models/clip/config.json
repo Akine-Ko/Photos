@@ -1,25 +1,23 @@
-{
-  "input_size": 224,
-  "mean": [0.0, 0.0, 0.0],
-  "std": [1.0, 1.0, 1.0],
-  "model_file": "mobileclip2_s2_image_encoder.onnx",
-  "model_data_file": "mobileclip2_s2_image_encoder.onnx.data",
-  "text_model_file": "mobileclip2_s2_text_encoder.onnx",
-  "text_model_data_file": "mobileclip2_s2_text_encoder.onnx.data",
-  "thresholds": {
-    "SELFIE": 0.38,
-    "GROUP": 0.38,
-    "IDPHOTO": 0.43,
-    "DRAWING": 0.38,
-    "CARD": 0.41,
-    "QRCODE": 0.44,
-    "NATURE": 0.38,
-    "PLANTS": 0.38,
-    "VEHICLES": 0.40,
-    "ARCHITECTURE": 0.38,
-    "PETS": 0.38,
-    "ELECTRONICS": 0.38,
-    "FOOD": 0.38,
-    "TEXT": 0.38
+﻿{
+  "input_size":256,
+  "mean":[0.0,0.0,0.0],
+  "std":[1.0,1.0,1.0],
+  "model_file":"MobileCLIP2-S2_image_encoder.onnx",
+  "model_data_file":"MobileCLIP2-S2_image_encoder.onnx.data",
+  "thresholds":{
+    "SELFIE":0.22,
+    "GROUP":0.23,
+    "IDPHOTO":0.22,
+    "DRAWING":0.24,
+    "CARD":0.25,
+    "QRCODE":0.27,
+    "NATURE":0.30,
+    "PLANTS":0.23,
+    "VEHICLES":0.27,
+    "ARCHITECTURE":0.18,
+    "PETS":0.23,
+    "ELECTRONICS":0.23,
+    "FOOD":0.23,
+    "TEXT":0.27
   }
 }
