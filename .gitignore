@@ -7,6 +7,13 @@ build/
 .externalNativeBuild/
 .cxx/
 
+deps.txt
+photos_tmp.db
+temp_file.txt
+
+# vscode设置
+/.vscode/
+
 # 旧git
 /.git_old/
 
