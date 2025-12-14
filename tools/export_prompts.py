@@ -2,9 +2,9 @@
 """
 Generate MobileCLIP text embeddings for the fixed category list used by the app.
 Usage example:
-  python tools/export_prompts.py \
-    --checkpoint models--mobileclip2-s2-dfndr2b/mobileclip2_s2_dfndr2b.pt \
-    --out-bin app/src/main/assets/models/clip/text_embeds_f32.bin \
+  python tools/export_prompts.py `
+    --checkpoint models--mobileclip2-s2-dfndr2b/mobileclip2_s2_dfndr2b.pt `
+    --out-bin app/src/main/assets/models/clip/text_embeds_f32.bin `
     --out-labels app/src/main/assets/models/clip/category_keys.txt
 """
 
@@ -27,7 +27,7 @@ if ML_MOBILECLIP_ROOT.is_dir():
 PROMPTS = [
     ("SELFIE", "a close up selfie portrait of one person facing the camera with no printed text overlay"),
     ("GROUP", "a group photo of several friends taking a selfie together"),
-    ("IDPHOTO", "an official passport style id portrait with a plain background"),
+    ("IDPHOTO", "an official style identification photo with a plain background"),
     ("DRAWING", "an illustration, a manga style drawing or a hand drawing without printed text"),
     ("CARD", "close up photo of bank cards or id cards"),
     ("QRCODE", "image showing a large qr code or barcode on paper or a phone screen"),
@@ -36,8 +36,8 @@ PROMPTS = [
     ("VEHICLES", "photo highlighting modern transportation vehicles such as cars trains airplanes or bikes"),
     ("ARCHITECTURE", "photo showcasing architectural exteriors such as landmark buildings city skylines monuments or modern facades"),
     ("PETS", "cute pet portrait featuring cats dogs or other domestic animals"),
-    ("ELECTRONICS", "photo focusing on modern electronic devices such as smartphones tablets laptops or gaming consoles"),
-    ("FOOD", "close up photo of delicious cooked food desserts or drinks on a table"),
+    ("ELECTRONICS", "photo focusing on modern electronic devices such as phones tablets laptops or gaming consoles"),
+    ("FOOD", "photos of delicious food desserts or drinks"),
     ("TEXT", "a text photo or a messaging screenshot mostly filled with text or forms"),
 ]
 

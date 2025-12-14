@@ -3,6 +3,7 @@ package com.example.photos.sync;
 import android.content.Context;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.ExistingWorkPolicy;
@@ -22,6 +23,14 @@ public class MediaIncrementalSyncWorker extends Worker {
     public static final String UNIQUE_PERIODIC_NAME = "images_incremental_periodic";
     public static final String UNIQUE_ONETIME_NAME = "images_incremental_onetime";
 
+    @VisibleForTesting
+    static void upsertDelta(android.content.Context appContext,
+                            java.util.List<com.example.photos.db.PhotoAsset> assets) {
+        if (assets == null || assets.isEmpty()) return;
+        com.example.photos.db.PhotosDb db = com.example.photos.db.PhotosDb.get(appContext);
+        db.photoDao().upsert(assets);
+    }
+
     public MediaIncrementalSyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
     }
@@ -37,6 +46,8 @@ public class MediaIncrementalSyncWorker extends Worker {
         boolean hasDelta = false;
         try {
             java.util.List<com.example.photos.db.PhotoAsset> list = com.example.photos.media.MediaScanner.scanModifiedAfter(app, last);
+            // 把增量写入本地表，后续向量/分类才能覆盖到新媒体。
+            upsertDelta(app, list);
             for (com.example.photos.db.PhotoAsset a : list) {
                 if (a != null) {
                     if (a.dateModified > maxTs) maxTs = a.dateModified;

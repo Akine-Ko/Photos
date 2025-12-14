@@ -30,8 +30,7 @@
                 android:paddingLeft="32dp"
                 android:paddingRight="24dp"
                 android:paddingTop="36dp"
-                android:paddingBottom="32dp"
-                android:minHeight="440dp"
+                android:paddingBottom="24dp"
                 app:cardBackgroundColor="#EEFFFFFF"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="12dp"
@@ -60,7 +59,7 @@
                             android:text="@string/info_label_name"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 
@@ -91,7 +90,7 @@
                             android:text="@string/info_label_time"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 
@@ -120,7 +119,7 @@
                             android:text="@string/info_label_size"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 
@@ -151,7 +150,7 @@
                             android:text="@string/info_label_params"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 
@@ -175,7 +174,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginTop="8dp">
+                        android:layout_marginTop="12dp">
 
                         <TextView
                             android:id="@+id/infoLabelPath"
@@ -184,7 +183,7 @@
                             android:text="@string/info_label_path"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 
@@ -206,7 +205,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginTop="8dp">
+                        android:layout_marginTop="12dp">
 
                         <TextView
                             android:id="@+id/infoLabelLocation"
@@ -215,7 +214,7 @@
                             android:text="@string/info_label_location"
                             android:textColor="#8A8A8A"
                             android:textSize="14sp"
-                            android:layout_marginEnd="14dp"
+                            android:layout_marginEnd="18dp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
 

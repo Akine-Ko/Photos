@@ -2,11 +2,14 @@ package com.example.photos.ui.albums;
 
 import android.app.PendingIntent;
 import android.app.RecoverableSecurityException;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -43,6 +46,7 @@ import com.example.photos.R;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.io.File;
 import java.io.InputStream;
 
@@ -226,7 +230,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (sizeView != null) sizeView.setText(info.sizeAndResolution());
         if (cameraView != null) cameraView.setText(info.cameraText());
         if (pathView != null) pathView.setText(nonNull(info.path, entry.url));
-        if (locationView != null) locationView.setText(info.locationText());
+        if (locationView != null) locationView.setText(info.locationDisplay(this));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
@@ -278,6 +282,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             info.path = entry.url;
         }
         readExif(info, uri);
+        maybeFillAddress(info);
         return info;
     }
 
@@ -304,6 +309,30 @@ public class AlbumViewerActivity extends AppCompatActivity {
             if (exif.getLatLong(latLong)) {
                 info.latitude = latLong[0];
                 info.longitude = latLong[1];
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void maybeFillAddress(@NonNull MediaInfo info) {
+        if (!info.hasLatLong()) return;
+        try {
+            Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+            List<Address> res = geocoder.getFromLocation(info.latitude, info.longitude, 1);
+            if (res != null && !res.isEmpty()) {
+                Address addr = res.get(0);
+                StringBuilder sb = new StringBuilder();
+                if (addr.getCountryName() != null) sb.append(addr.getCountryName()).append(" 路 ");
+                if (addr.getAdminArea() != null) sb.append(addr.getAdminArea()).append(" 路 ");
+                if (addr.getSubAdminArea() != null) sb.append(addr.getSubAdminArea()).append(" 路 ");
+                if (addr.getLocality() != null) sb.append(addr.getLocality()).append(" 路 ");
+                if (addr.getSubLocality() != null) sb.append(addr.getSubLocality()).append(" 路 ");
+                if (addr.getThoroughfare() != null) sb.append(addr.getThoroughfare()).append(" 路 ");
+                if (addr.getSubThoroughfare() != null) sb.append(addr.getSubThoroughfare());
+                String text = sb.toString().replaceAll("\\s*路\\s*$", "");
+                if (!text.isEmpty()) {
+                    info.address = text;
+                }
             }
         } catch (Exception ignored) {
         }
@@ -724,7 +753,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
     }
 
-    private static class MediaInfo {
+            private static class MediaInfo {
         String displayName;
         String path;
         long sizeBytes = 0;
@@ -742,6 +771,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         double exposureBiasEv = Double.NaN;
         float latitude = Float.NaN;
         float longitude = Float.NaN;
+        String address;
 
         String prettySize() {
             if (sizeBytes <= 0) return "";
@@ -753,11 +783,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
         String sizeAndResolution() {
             String size = sizeBytes > 0 ? prettySize() : "";
-            String resolution = (width > 0 && height > 0) ? width + " × " + height : "";
+            String resolution = (width > 0 && height > 0) ? width + " x " + height : "";
             if (!size.isEmpty() && !resolution.isEmpty()) return size + "  " + resolution;
             if (!size.isEmpty()) return size;
             if (!resolution.isEmpty()) return resolution;
-            return "未知";
+            return "\u672a\u77e5"; // 未知
         }
 
         String displayDate() {
@@ -787,38 +817,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 sb.append(cameraModel.trim());
             }
             if (lensModel != null && !lensModel.isEmpty()) {
-                if (sb.length() > 0) sb.append(" · ");
+                if (sb.length() > 0) sb.append(" | ");
                 sb.append(lensModel.trim());
             }
             if (cameraMake != null && !cameraMake.isEmpty()) {
                 if (sb.length() > 0) sb.append(", ");
                 sb.append(cameraMake.trim());
             }
-            return sb.length() == 0 ? "无相机信息" : sb.toString();
-        }
-
-        String focalLengthText() {
-            if (!isKnown(focalLengthMm) || focalLengthMm <= 0) return "--";
-            return String.format(java.util.Locale.getDefault(), "%.2fmm", focalLengthMm);
-        }
-
-        String apertureText() {
-            if (!isKnown(aperture) || aperture <= 0) return "--";
-            return "f/" + trimTrailingZeros(aperture);
-        }
-
-        String shutterText() {
-            if (!isKnown(exposureTimeSeconds) || exposureTimeSeconds <= 0) return "--";
-            if (exposureTimeSeconds < 1.0) {
-                long denom = Math.round(1.0 / exposureTimeSeconds);
-                if (denom > 0) {
-                    return "1/" + denom + "s";
-                }
-            }
-            if (exposureTimeSeconds < 10.0) {
-                return String.format(java.util.Locale.getDefault(), "%.2fs", exposureTimeSeconds);
-            }
-            return String.format(java.util.Locale.getDefault(), "%.0fs", exposureTimeSeconds);
+            return sb.length() == 0 ? "\u65e0\u76f8\u673a\u4fe1\u606f" : sb.toString(); // 无相机信息
         }
 
         String isoText() {
@@ -830,19 +836,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
             return "EV " + trimTrailingZeros(exposureBiasEv);
         }
 
-        boolean hasExposureInfo() {
-            return (isKnown(focalLengthMm) && focalLengthMm > 0)
-                    || (isKnown(aperture) && aperture > 0)
-                    || (isKnown(exposureTimeSeconds) && exposureTimeSeconds > 0)
-                    || iso > 0
-                    || isKnown(exposureBiasEv);
-        }
-
-        String locationText() {
+        String locationDisplay(@NonNull Context ctx) {
             if (hasLatLong()) {
+                if (address != null && !address.isEmpty()) {
+                    return address;
+                }
                 return String.format(java.util.Locale.getDefault(), "%.5f, %.5f", latitude, longitude);
             }
-            return "无位置信息";
+            return "\u65e0\u4f4d\u7f6e\u4fe1\u606f"; // 无位置信息
         }
 
         private String trimTrailingZeros(double value) {
@@ -865,3 +866,4 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
     }
 }
+
