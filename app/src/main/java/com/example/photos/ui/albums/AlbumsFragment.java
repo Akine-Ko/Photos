@@ -28,6 +28,8 @@ public class AlbumsFragment extends Fragment {
     private AlbumsAdapter albumsAdapter;
     private TextView emptyTextView;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private View addButton;
+    private View multiSelectButton;
 
     @Nullable
     @Override
@@ -41,10 +43,13 @@ public class AlbumsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         emptyTextView = view.findViewById(R.id.albumsEmptyTextView);
         swipeRefreshLayout = view.findViewById(R.id.albumsSwipeRefresh);
+        addButton = view.findViewById(R.id.albumsAddButton);
+        multiSelectButton = view.findViewById(R.id.albumsMultiSelectButton);
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setColorSchemeResources(R.color.brand_primary);
         }
         setupRecyclerView(view);
+        setupActions();
         android.content.Context app = requireContext().getApplicationContext();
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setOnRefreshListener(() -> renderAlbumsAsync(app));
@@ -95,7 +100,7 @@ public class AlbumsFragment extends Fragment {
                         .show();
             }
         });
-        final int spanCount = 2;
+        final int spanCount = 4;
         recyclerView.setLayoutManager(new GridLayoutManager(requireContext(), spanCount));
         int spacing = getResources().getDimensionPixelSize(R.dimen.home_list_spacing);
         recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, spacing, true));
@@ -151,5 +156,16 @@ public class AlbumsFragment extends Fragment {
                 }
             });
         });
+    }
+
+    private void setupActions() {
+        if (addButton != null) {
+            addButton.setOnClickListener(v ->
+                    android.widget.Toast.makeText(requireContext(), "添加相册功能即将开放", android.widget.Toast.LENGTH_SHORT).show());
+        }
+        if (multiSelectButton != null) {
+            multiSelectButton.setOnClickListener(v ->
+                    android.widget.Toast.makeText(requireContext(), "多选模式即将开放", android.widget.Toast.LENGTH_SHORT).show());
+        }
     }
 }

@@ -21,7 +21,7 @@ final class CategoryDisplay {
         MAP.put("CARD", "卡证");
         MAP.put("QRCODE", "二维码");
         MAP.put("LIFE", "生活");
-        MAP.put("DRAWING", "涂鸦");
+        MAP.put("DRAWING", "绘画");
         MAP.put("PETS", "宠物");
         MAP.put("PLANTS", "植物");
         MAP.put("NATURE", "自然风光");
