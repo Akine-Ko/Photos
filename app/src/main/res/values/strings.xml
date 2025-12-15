@@ -19,7 +19,7 @@
     <string name="home_summary_favorite_label">精选收藏</string>
     <string name="home_summary_filtered_label">当前筛选</string>
 
-    <string name="home_search_hint">搜索拍摄地点 / 事件 / 标签</string>
+    <string name="home_search_hint">描述图片内容以搜索相关图片</string>
     <string name="home_search_running">正在执行文字检索…</string>
     <string name="home_search_result_message">找到 %1$d 张与「%2$s」匹配的照片</string>
     <string name="search_by_image">以图搜图</string>

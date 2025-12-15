@@ -112,6 +112,7 @@ public class AlbumsFragment extends Fragment {
             try {
                 // Normalize legacy WORK -> TEXT once before querying
                 try { com.example.photos.db.PhotosDb.get(appContext).categoryDao().renameCategory("WORK", "TEXT"); } catch (Throwable ignore) {}
+                try { com.example.photos.db.PhotosDb.get(appContext).categoryDao().renameCategory("IDPHOTO", "CARD"); } catch (Throwable ignore) {}
                 com.example.photos.db.CategoryDao dao = com.example.photos.db.PhotosDb.get(appContext).categoryDao();
                 List<com.example.photos.db.CategoryDao.CategoryCount> counts = dao.countsByCategory();
                 for (com.example.photos.db.CategoryDao.CategoryCount c : counts) {

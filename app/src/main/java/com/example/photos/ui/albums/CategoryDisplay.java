@@ -14,7 +14,7 @@ final class CategoryDisplay {
         MAP.put("ALL", "全部");
         MAP.put("SELFIE", "自拍");
         MAP.put("GROUP", "合照");
-        MAP.put("IDPHOTO", "证件照");
+        MAP.put("IDPHOTO", "卡证");
         MAP.put("TRAVEL", "旅行");
         MAP.put("FOOD", "美食");
         MAP.put("TEXT", "文本");

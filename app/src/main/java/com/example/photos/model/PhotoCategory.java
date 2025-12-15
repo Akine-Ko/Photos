@@ -7,7 +7,6 @@ public enum PhotoCategory {
     ALL("全部"),
     SELFIE("自拍"),
     GROUP("合照"),
-    IDPHOTO("证件照"),
     DRAWING("绘画"),
     CARD("卡证"),
     QRCODE("二维码"),

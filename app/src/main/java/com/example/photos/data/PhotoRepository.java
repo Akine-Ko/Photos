@@ -98,7 +98,6 @@ public class PhotoRepository {
                 PhotoCategory.SELFIE,
                 PhotoCategory.GROUP,
                 PhotoCategory.GROUP,
-                PhotoCategory.IDPHOTO,
                 PhotoCategory.TRAVEL,
                 PhotoCategory.FOOD,
                 PhotoCategory.TEXT,
@@ -236,7 +235,6 @@ public class PhotoRepository {
         return sample;
     }
 }
-
 
 
 

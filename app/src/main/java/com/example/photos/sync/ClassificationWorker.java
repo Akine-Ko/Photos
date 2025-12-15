@@ -126,6 +126,9 @@ public class ClassificationWorker extends Worker {
                                FeatureDao featureDao,
                                boolean reprocessExisting) {
         if (assets == null || assets.isEmpty()) return 0;
+        try {
+            categoryDao.renameCategory("IDPHOTO", "CARD");
+        } catch (Throwable ignore) {}
         List<CategoryRecord> pending = new ArrayList<>();
         int visited = 0;
         for (PhotoAsset asset : assets) {
@@ -157,7 +160,7 @@ public class ClassificationWorker extends Worker {
             }
             CategoryRecord record = new CategoryRecord();
             record.mediaKey = asset.contentUri;
-            record.category = result.label;
+            record.category = mapMergedCategory(result.label);
             record.score = result.score;
             record.updatedAt = System.currentTimeMillis() / 1000L;
             pending.add(record);
@@ -167,6 +170,15 @@ public class ClassificationWorker extends Worker {
             Log.i(TAG, "Classified " + pending.size() + " assets.");
         }
         return visited;
+    }
+
+    private String mapMergedCategory(String label) {
+        if (label == null) return null;
+        String upper = label.toUpperCase(java.util.Locale.US);
+        if ("IDPHOTO".equals(upper)) {
+            return "CARD";
+        }
+        return label;
     }
 
     public static void enqueueRecent(Context context) {

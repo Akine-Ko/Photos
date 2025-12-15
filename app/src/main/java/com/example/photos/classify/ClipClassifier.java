@@ -162,6 +162,43 @@ public final class ClipClassifier {
         return bestLabel == null ? null : new Result(bestLabel, bestScore);
     }
 
+    /**
+     * Best label excluding certain keys (case-insensitive).
+     */
+    public static Result bestLabelExcluding(float[] embedding, java.util.Set<String> exclude) {
+        if (embedding == null) return null;
+        if (!initialized || textEmbeddings == null) return null;
+        float bestScore = -Float.MAX_VALUE;
+        String bestLabel = null;
+        for (int i = 0; i < labels.size(); i++) {
+            String label = labels.get(i);
+            if (exclude != null) {
+                String upper = label == null ? "" : label.toUpperCase(java.util.Locale.US);
+                if (exclude.contains(upper)) continue;
+            }
+            float s = dot(embedding, textEmbeddings, i * embeddingDim, embeddingDim);
+            if (s > bestScore) {
+                bestScore = s;
+                bestLabel = label;
+            }
+        }
+        return bestLabel == null ? null : new Result(bestLabel, bestScore);
+    }
+
+    /**
+     * Return raw dot-product score for a specific label, or NaN if unavailable.
+     */
+    public static float scoreForLabel(float[] embedding, String label) {
+        if (embedding == null || label == null) return Float.NaN;
+        if (!initialized || textEmbeddings == null || labels == null) return Float.NaN;
+        for (int i = 0; i < labels.size(); i++) {
+            if (label.equalsIgnoreCase(labels.get(i))) {
+                return dot(embedding, textEmbeddings, i * embeddingDim, embeddingDim);
+            }
+        }
+        return Float.NaN;
+    }
+
     private static float[] runOnnx(float[] chw) throws Exception {
         if (session == null || env == null) return null;
         FloatBuffer fb = FloatBuffer.wrap(chw);
