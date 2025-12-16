@@ -101,7 +101,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
         ImageButton backButton = findViewById(R.id.albumViewerBackButton);
         ImageButton shareButton = findViewById(R.id.albumViewerShareButton);
         ImageButton deleteButton = findViewById(R.id.albumViewerDeleteButton);
-        ImageButton moreButton = findViewById(R.id.albumViewerMoreButton);
+        ImageButton editButton = findViewById(R.id.albumViewerEditButton);
+        ImageButton addToButton = findViewById(R.id.albumViewerAddToButton);
         ImageButton infoButton = findViewById(R.id.albumViewerInfoButton);
         RecyclerView thumbRecyclerView = findViewById(R.id.albumViewerThumbRecyclerView);
         View root = findViewById(R.id.albumViewerRoot);
@@ -138,7 +139,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> finishWithResult());
         shareButton.setOnClickListener(v -> shareCurrent());
         deleteButton.setOnClickListener(v -> deleteCurrent());
-        moreButton.setOnClickListener(v -> Toast.makeText(this, R.string.more, Toast.LENGTH_SHORT).show());
+        editButton.setOnClickListener(v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show());
+        addToButton.setOnClickListener(v -> Toast.makeText(this, R.string.add_to, Toast.LENGTH_SHORT).show());
         infoButton.setOnClickListener(v -> showInfoForCurrent());
 
         ArrayList<String> urls = getIntent().getStringArrayListExtra(EXTRA_URLS);
@@ -866,4 +868,3 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
     }
 }
-
