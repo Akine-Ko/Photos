@@ -120,8 +120,10 @@ public class AlbumsFragment extends Fragment {
                 try { com.example.photos.db.PhotosDb.get(appContext).categoryDao().renameCategory("IDPHOTO", "CARD"); } catch (Throwable ignore) {}
                 com.example.photos.db.CategoryDao dao = com.example.photos.db.PhotosDb.get(appContext).categoryDao();
                 List<com.example.photos.db.CategoryDao.CategoryCount> counts = dao.countsByCategory();
+                java.util.Set<String> existing = new java.util.HashSet<>();
                 for (com.example.photos.db.CategoryDao.CategoryCount c : counts) {
                     if (c == null || c.category == null) continue;
+                    existing.add(c.category);
                     String cover = dao.latestKeyForCategory(c.category);
                     if (cover == null) cover = "";
                     albums.add(new SmartAlbum(
@@ -132,6 +134,22 @@ public class AlbumsFragment extends Fragment {
                             cover,
                             c.cnt
                     ));
+                }
+                // Append user-created empty albums (if not already existing)
+                List<String> custom = CustomAlbumsStore.loadAll(appContext);
+                if (custom != null) {
+                    for (String name : custom) {
+                        if (name == null || name.trim().isEmpty()) continue;
+                        if (existing.contains(name)) continue;
+                        albums.add(new SmartAlbum(
+                                PhotoCategory.ALL,
+                                name,
+                                "自定义相册",
+                                "",
+                                "",
+                                0
+                        ));
+                    }
                 }
             } catch (Throwable ignore) {
                 success = false;
@@ -160,12 +178,42 @@ public class AlbumsFragment extends Fragment {
 
     private void setupActions() {
         if (addButton != null) {
-            addButton.setOnClickListener(v ->
-                    android.widget.Toast.makeText(requireContext(), "添加相册功能即将开放", android.widget.Toast.LENGTH_SHORT).show());
+            addButton.setOnClickListener(v -> promptAddAlbum());
         }
         if (multiSelectButton != null) {
             multiSelectButton.setOnClickListener(v ->
                     android.widget.Toast.makeText(requireContext(), "多选模式即将开放", android.widget.Toast.LENGTH_SHORT).show());
         }
+    }
+
+    private void promptAddAlbum() {
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(requireContext());
+        android.view.View dialogView = inflater.inflate(R.layout.dialog_add_album, null, false);
+        android.widget.EditText input = dialogView.findViewById(R.id.addAlbumInput);
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setView(dialogView)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        android.view.View confirm = dialogView.findViewById(R.id.addAlbumConfirm);
+        android.view.View cancel = dialogView.findViewById(R.id.addAlbumCancel);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        confirm.setOnClickListener(v -> {
+            String name = input.getText() == null ? "" : input.getText().toString().trim();
+            if (name.isEmpty()) {
+                android.widget.Toast.makeText(requireContext(), R.string.albums_add_album_empty, android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            boolean added = CustomAlbumsStore.add(requireContext().getApplicationContext(), name);
+            if (!added) {
+                android.widget.Toast.makeText(requireContext(), R.string.albums_add_album_exists, android.widget.Toast.LENGTH_SHORT).show();
+            } else {
+                android.widget.Toast.makeText(requireContext(), R.string.albums_add_album_done, android.widget.Toast.LENGTH_SHORT).show();
+                renderAlbumsAsync(requireContext().getApplicationContext());
+                dialog.dismiss();
+            }
+        });
+        dialog.show();
     }
 }
