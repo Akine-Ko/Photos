@@ -20,6 +20,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.EditText;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
+import android.graphics.Typeface;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,8 +50,10 @@ import com.example.photos.R;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.io.File;
 import java.io.InputStream;
 
@@ -145,7 +151,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         View.OnClickListener shareClickListener = v -> shareCurrent();
         View.OnClickListener deleteClickListener = v -> deleteCurrent();
         View.OnClickListener editClickListener = v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show();
-        View.OnClickListener addToClickListener = v -> Toast.makeText(this, R.string.add_to, Toast.LENGTH_SHORT).show();
+        View.OnClickListener addToClickListener = v -> showAddToAlbum();
         if (shareButtonContainer != null) {
             shareButtonContainer.setOnClickListener(shareClickListener);
         } else {
@@ -424,6 +430,179 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (entry == null || entry.url == null) return;
         Uri uri = Uri.parse(entry.url);
         showDeleteConfirmDialog(entry, uri, position);
+    }
+
+    @Nullable
+    private PhotoEntry currentEntry() {
+        int position = pager == null ? -1 : pager.getCurrentItem();
+        if (position < 0 || position >= entries.size()) return null;
+        return entries.get(position);
+    }
+
+    private void showAddToAlbum() {
+        PhotoEntry entry = currentEntry();
+        if (entry == null || entry.url == null) {
+            Toast.makeText(this, R.string.album_add_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        dbExecutor.execute(() -> {
+            List<AlbumOption> albumOptions = loadAlbumOptions();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (albumOptions.isEmpty()) {
+                    promptCreateAlbum(entry);
+                } else {
+                    showAlbumPicker(entry, albumOptions);
+                }
+            });
+        });
+    }
+
+    @NonNull
+    private List<AlbumOption> loadAlbumOptions() {
+        Set<String> names = new LinkedHashSet<>();
+        try {
+            List<com.example.photos.db.CategoryDao.CategoryCount> counts =
+                    com.example.photos.db.PhotosDb.get(getApplicationContext())
+                            .categoryDao()
+                            .countsByCategory();
+            for (com.example.photos.db.CategoryDao.CategoryCount c : counts) {
+                if (c == null || c.category == null) continue;
+                String trimmed = c.category.trim();
+                if (!trimmed.isEmpty()) {
+                    names.add(trimmed);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            List<String> custom = CustomAlbumsStore.loadAll(getApplicationContext());
+            if (custom != null) {
+                for (String n : custom) {
+                    if (n == null) continue;
+                    String trimmed = n.trim();
+                    if (!trimmed.isEmpty()) {
+                        names.add(trimmed);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        List<AlbumOption> result = new ArrayList<>();
+        for (String n : names) {
+            result.add(new AlbumOption(n, CategoryDisplay.displayOf(n)));
+        }
+        try {
+            result.sort((a, b) -> a.display.compareToIgnoreCase(b.display));
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    private void showAlbumPicker(@NonNull PhotoEntry entry, @NonNull List<AlbumOption> albums) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_album_picker, null, false);
+        ListView listView = dialogView.findViewById(R.id.albumPickerList);
+        View newButton = dialogView.findViewById(R.id.albumPickerNew);
+        View cancelButton = dialogView.findViewById(R.id.albumPickerCancel);
+        List<String> displayNames = new ArrayList<>();
+        for (AlbumOption o : albums) {
+            displayNames.add(o.display);
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.item_album_picker, R.id.albumPickerItemText, displayNames) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                TextView tv = v.findViewById(R.id.albumPickerItemText);
+                if (tv != null) {
+                    tv.setTypeface(tv.getTypeface(), Typeface.BOLD);
+                }
+                return v;
+            }
+        };
+        listView.setAdapter(adapter);
+        listView.setDivider(null);
+        listView.setDividerHeight(0);
+        listView.setHeaderDividersEnabled(false);
+        listView.setFooterDividersEnabled(false);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            if (position >= 0 && position < albums.size()) {
+                addEntryToAlbum(entry, albums.get(position).name);
+            }
+            dialog.dismiss();
+        });
+        if (newButton != null) {
+            newButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                promptCreateAlbum(entry);
+            });
+        }
+        if (cancelButton != null) {
+            cancelButton.setOnClickListener(v -> dialog.dismiss());
+        }
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+    }
+
+    private void promptCreateAlbum(@NonNull PhotoEntry entry) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_album, null, false);
+        EditText input = dialogView.findViewById(R.id.addAlbumInput);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+        View confirm = dialogView.findViewById(R.id.addAlbumConfirm);
+        View cancel = dialogView.findViewById(R.id.addAlbumCancel);
+        if (cancel != null) {
+            cancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        if (confirm != null) {
+            confirm.setOnClickListener(v -> {
+                String name = input != null && input.getText() != null
+                        ? input.getText().toString().trim()
+                        : "";
+                if (name.isEmpty()) {
+                    Toast.makeText(this, R.string.albums_add_album_empty, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                addEntryToAlbum(entry, name);
+                dialog.dismiss();
+            });
+        }
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+    }
+
+    private void addEntryToAlbum(@NonNull PhotoEntry entry, @NonNull String albumName) {
+        dbExecutor.execute(() -> {
+            boolean success = false;
+            try {
+                CustomAlbumsStore.add(getApplicationContext(), albumName);
+                com.example.photos.db.CategoryRecord record = new com.example.photos.db.CategoryRecord();
+                record.mediaKey = entry.url;
+                record.category = albumName;
+                record.score = 1f;
+                record.updatedAt = System.currentTimeMillis();
+                com.example.photos.db.PhotosDb.get(getApplicationContext()).categoryDao().upsert(record);
+                success = true;
+            } catch (Throwable ignored) {
+            }
+            boolean finalSuccess = success;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                Toast.makeText(this,
+                        finalSuccess
+                                ? getString(R.string.album_add_success, albumName)
+                                : getString(R.string.album_add_failed),
+                        Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
     private void showDeleteConfirmDialog(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
@@ -786,7 +965,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
     }
 
-            private static class MediaInfo {
+    private static class MediaInfo {
         String displayName;
         String path;
         long sizeBytes = 0;
@@ -896,6 +1075,16 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
         private boolean hasLatLong() {
             return !Float.isNaN(latitude) && !Float.isNaN(longitude);
+        }
+    }
+
+    private static class AlbumOption {
+        final String name;
+        final String display;
+
+        AlbumOption(String name, String display) {
+            this.name = name;
+            this.display = display == null ? name : display;
         }
     }
 }
