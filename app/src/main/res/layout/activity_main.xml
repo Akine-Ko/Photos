@@ -22,7 +22,34 @@
         app:titleCentered="false"
         app:navigationIconTint="@color/brand_on_surface"
         app:titleTextColor="@color/brand_on_surface"
-        app:titleTextAppearance="@style/TopBarTitle" />
+        app:titleTextAppearance="@style/TopBarTitle" >
+
+        <TextView
+            android:id="@+id/mainSelectAll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/select_all"
+            android:textColor="@color/brand_primary"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/mainSelectionTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/select_items"
+            android:textAppearance="@style/TopBarTitle"
+            android:textColor="@color/brand_on_surface"
+            android:visibility="gone" />
+
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <!-- Navigation 宿主，用于切换首页/智能分类/我的 -->
     <androidx.fragment.app.FragmentContainerView
@@ -32,10 +59,18 @@
         android:layout_height="0dp"
         app:defaultNavHost="true"
         app:layout_constraintTop_toBottomOf="@id/topAppBar"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBarrier"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:navGraph="@navigation/nav_graph"/>
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/bottomNavBarrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierAllowsGoneWidgets="true"
+        app:barrierDirection="top"
+        app:constraint_referenced_ids="bottomNavigation,selectionBottomNavigation" />
 
     <!-- 底部导航栏：漂浮卡片样式，保持与系统手势区间隔 -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
@@ -66,5 +101,35 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:menu="@menu/bottom_nav_menu"/>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/selectionBottomNavigation"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:minHeight="68dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="14dp"
+        android:background="@drawable/bg_bottom_nav"
+        android:elevation="12dp"
+        android:translationZ="12dp"
+        android:visibility="gone"
+        app:itemActiveIndicatorStyle="@null"
+        app:itemBackground="@drawable/bottom_nav_item_background_action"
+        app:itemIconTint="@color/bottom_nav_action_selector"
+        app:itemTextColor="@color/bottom_nav_action_selector"
+        app:itemIconSize="26dp"
+        app:itemRippleColor="@color/bottom_nav_ripple"
+        app:itemTextAppearanceActive="@style/BottomNavTextActive"
+        app:itemTextAppearanceInactive="@style/BottomNavTextInactive"
+        app:labelVisibilityMode="labeled"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:menu="@menu/category_photos_bottom_menu"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

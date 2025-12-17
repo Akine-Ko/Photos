@@ -289,6 +289,31 @@ public class HomeFragment extends Fragment {
         int startIndex;
     }
 
+    public void setMultiSelectEnabled(boolean enabled) {
+        if (timelineAdapter == null) return;
+        timelineAdapter.setSelectionMode(enabled);
+    }
+
+    public boolean isMultiSelectEnabled() {
+        return timelineAdapter != null && timelineAdapter.isSelectionMode();
+    }
+
+    public void toggleSelectAll() {
+        if (timelineAdapter == null) return;
+        timelineAdapter.toggleSelectAll();
+    }
+
+    @NonNull
+    public List<Photo> getSelectedPhotos() {
+        if (timelineAdapter == null) return new ArrayList<>();
+        return timelineAdapter.getSelectedPhotos();
+    }
+
+    public void reload() {
+        if (!isAdded() || viewModel == null) return;
+        viewModel.reloadFromMediaStore(requireContext().getApplicationContext());
+    }
+
     private void removeDeletedFromMemory(List<String> deletedIds) {
         boolean changedTimeline = false;
         for (int i = currentTimelinePhotos.size() - 1; i >= 0; i--) {

@@ -17,7 +17,7 @@ import java.util.Set;
 /**
  * Lightweight persistence for user-created albums (names with creation order).
  */
-final class CustomAlbumsStore {
+public final class CustomAlbumsStore {
 
     private static final String PREFS = "custom_albums_store";
     private static final String KEY_NAMES = "names"; // legacy
@@ -25,7 +25,7 @@ final class CustomAlbumsStore {
 
     private CustomAlbumsStore() {}
 
-    static List<String> loadAll(Context context) {
+    public static List<String> loadAll(Context context) {
         List<AlbumMeta> metas = loadAllWithMeta(context);
         List<String> names = new ArrayList<>();
         for (AlbumMeta m : metas) {
@@ -34,7 +34,7 @@ final class CustomAlbumsStore {
         return names;
     }
 
-    static List<AlbumMeta> loadAllWithMeta(Context context) {
+    public static List<AlbumMeta> loadAllWithMeta(Context context) {
         if (context == null) return Collections.emptyList();
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String json = prefs.getString(KEY_ORDERED, null);
@@ -69,7 +69,7 @@ final class CustomAlbumsStore {
         return result;
     }
 
-    static boolean add(Context context, String name) {
+    public static boolean add(Context context, String name) {
         if (context == null || name == null) return false;
         String trimmed = name.trim();
         if (trimmed.isEmpty()) return false;
@@ -85,7 +85,7 @@ final class CustomAlbumsStore {
         return true;
     }
 
-    static void remove(Context context, String name) {
+    public static void remove(Context context, String name) {
         if (context == null || name == null) return;
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         List<AlbumMeta> metas = loadAllWithMeta(context);
@@ -120,9 +120,9 @@ final class CustomAlbumsStore {
         }
     }
 
-    static final class AlbumMeta {
-        final String name;
-        final long createdAt;
+    public static final class AlbumMeta {
+        public final String name;
+        public final long createdAt;
 
         AlbumMeta(String name, long createdAt) {
             this.name = name;
