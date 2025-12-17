@@ -4,6 +4,9 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,6 +21,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -74,15 +78,13 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                 int id = item.getItemId();
                 if (id == R.id.action_share) {
                     shareSelected();
-                    return true;
                 } else if (id == R.id.action_delete) {
                     requestDeleteSelected();
-                    return true;
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbum();
-                    return true;
                 }
-                return false;
+                clearBottomNavSelection();
+                return false; // treat as actions; don't keep selected state
             });
             bottomNavigation.setOnItemReselectedListener(item -> {
                 int id = item.getItemId();
@@ -93,6 +95,7 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbum();
                 }
+                clearBottomNavSelection();
             });
         }
         if (selectAllView != null) {
@@ -203,7 +206,12 @@ public class CategoryPhotosActivity extends AppCompatActivity {
         MenuItem cancel = menu.findItem(R.id.action_cancel_selection);
         if (multi != null) multi.setVisible(!selectionMode);
         if (clear != null) clear.setVisible(!selectionMode);
-        if (cancel != null) cancel.setVisible(selectionMode);
+        if (cancel != null) {
+            cancel.setVisible(selectionMode);
+            if (selectionMode) {
+                tintMenuItemBlue(cancel);
+            }
+        }
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -302,6 +310,7 @@ public class CategoryPhotosActivity extends AppCompatActivity {
         if (show) {
             if (bottomNavigation.getVisibility() != View.VISIBLE) {
                 bottomNavigation.setVisibility(View.VISIBLE);
+                clearBottomNavSelection();
                 bottomNavigation.post(() -> {
                     bottomNavigation.setTranslationY(bottomNavigation.getHeight() + 200f);
                     bottomNavigation.animate()
@@ -320,8 +329,25 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                         .withEndAction(() -> {
                             bottomNavigation.setVisibility(View.GONE);
                             bottomNavigation.setTranslationY(0f);
+                            clearBottomNavSelection();
                         })
                         .start();
+            }
+        }
+    }
+
+    private void clearBottomNavSelection() {
+        if (bottomNavigation == null) return;
+        android.view.Menu menu = bottomNavigation.getMenu();
+        try {
+            menu.setGroupCheckable(0, false, false);
+        } catch (Throwable ignored) {
+        }
+        for (int i = 0; i < menu.size(); i++) {
+            try {
+                menu.getItem(i).setCheckable(false);
+                menu.getItem(i).setChecked(false);
+            } catch (Throwable ignored) {
             }
         }
     }
@@ -634,6 +660,15 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                         android.widget.Toast.LENGTH_SHORT).show();
             });
         });
+    }
+
+    private void tintMenuItemBlue(@NonNull MenuItem item) {
+        CharSequence title = item.getTitle();
+        if (title == null) return;
+        int color = ContextCompat.getColor(this, R.color.brand_primary);
+        SpannableString s = new SpannableString(title);
+        s.setSpan(new ForegroundColorSpan(color), 0, s.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        item.setTitle(s);
     }
 
     @Override

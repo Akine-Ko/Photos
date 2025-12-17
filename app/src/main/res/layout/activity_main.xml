@@ -53,6 +53,7 @@
         android:background="@drawable/bg_bottom_nav"
         android:elevation="12dp"
         android:translationZ="12dp"
+        app:itemActiveIndicatorStyle="@null"
         app:itemBackground="@drawable/bottom_nav_item_background"
         app:itemIconTint="@color/bottom_nav_selector"
         app:itemTextColor="@color/bottom_nav_selector"
