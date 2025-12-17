@@ -20,6 +20,8 @@ public class MediaScanner {
 
     private static final Uri IMAGES = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
     private static final Uri VIDEOS = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+    private static final String DEFAULT_ORDER =
+            MediaStore.MediaColumns.DATE_MODIFIED + " DESC, " + MediaStore.MediaColumns._ID + " DESC";
 
     private static final String[] IMAGE_PROJECTION = new String[]{
             MediaStore.Images.Media._ID,
@@ -49,7 +51,7 @@ public class MediaScanner {
     };
 
     public static List<PhotoAsset> scanAll(Context context) {
-        return queryImages(context, null, null, null);
+        return queryImages(context, null, null, DEFAULT_ORDER);
     }
 
     /**
@@ -58,8 +60,27 @@ public class MediaScanner {
     public static List<PhotoAsset> scanAllMedia(Context context) {
         List<PhotoAsset> merged = new ArrayList<>();
         merged.addAll(scanAll(context));
-        merged.addAll(queryVideos(context, null, null, null));
+        merged.addAll(queryVideos(context, null, null, DEFAULT_ORDER));
+        merged.sort((a, b) -> {
+            long ta = bestTimestampMillis(a);
+            long tb = bestTimestampMillis(b);
+            if (ta != tb) return Long.compare(tb, ta);
+            long ida = a == null ? 0L : a.id;
+            long idb = b == null ? 0L : b.id;
+            if (ida != idb) return Long.compare(idb, ida);
+            String ua = a == null || a.contentUri == null ? "" : a.contentUri;
+            String ub = b == null || b.contentUri == null ? "" : b.contentUri;
+            return ub.compareTo(ua);
+        });
         return merged;
+    }
+
+    private static long bestTimestampMillis(PhotoAsset asset) {
+        if (asset == null) return 0L;
+        if (asset.dateTaken > 0L) return asset.dateTaken;
+        long mod = asset.dateModified;
+        if (mod <= 0L) return 0L;
+        return mod < 10_000_000_000L ? mod * 1000L : mod;
     }
 
     public static List<PhotoAsset> scanModifiedAfter(Context context, long ts) {

@@ -80,6 +80,8 @@ public class MediaStoreRepository {
     private static String formatDate(long ts) {
         if (ts <= 0L) return "";
         Date d = new Date(ts);
-        return new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(d);
+        // Include seconds to avoid many items sharing the same minute key,
+        // which makes ordering unstable across reloads.
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(d);
     }
 }

@@ -226,10 +226,22 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         if (!timelineMode) {
             Photo photo = items.get(position);
             if (photo == null) return RecyclerView.NO_ID;
-            if (photo.getId() != null) return photo.getId().hashCode();
-            return Objects.hash(photo.getImageUrl(), position);
+            return stableIdOf(photo, position);
         }
         return timelineItems.get(position).stableId;
+    }
+
+    private long stableIdOf(@NonNull Photo photo, int positionFallback) {
+        String id = photo.getId();
+        if (id != null) {
+            try {
+                return Long.parseLong(id);
+            } catch (NumberFormatException ignored) {
+                // fall through
+            }
+            return (long) id.hashCode();
+        }
+        return (long) Objects.hash(photo.getImageUrl(), positionFallback);
     }
 
     @NonNull
@@ -393,12 +405,19 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
 
         static TimelineEntry photo(Photo photo) {
-            long id = photo == null || photo.getId() == null ? RecyclerView.NO_ID : photo.getId().hashCode();
+            long id = RecyclerView.NO_ID;
+            if (photo != null && photo.getId() != null) {
+                try {
+                    id = Long.parseLong(photo.getId());
+                } catch (NumberFormatException ignored) {
+                    id = photo.getId().hashCode();
+                }
+            }
             return new TimelineEntry(TYPE_PHOTO, null, photo, null, id);
         }
 
         static TimelineEntry overview(HomeOverview overview) {
-            long id = overview == null ? 0L : Objects.hash(overview.greeting, overview.totalPhotos, overview.filteredCount);
+            long id = 0x4F56455256494557L; // "OVERVIEW" marker
             return new TimelineEntry(TYPE_OVERVIEW, null, null, overview, id);
         }
     }
@@ -442,7 +461,13 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
             Photo old = oldList.get(oldItemPosition);
             Photo newer = newList.get(newItemPosition);
-            return Objects.equals(old.getId(), newer.getId());
+            String oldId = old == null ? null : old.getId();
+            String newId = newer == null ? null : newer.getId();
+            if (oldId != null || newId != null) {
+                return Objects.equals(oldId, newId);
+            }
+            return Objects.equals(old == null ? null : old.getImageUrl(),
+                    newer == null ? null : newer.getImageUrl());
         }
 
         @Override

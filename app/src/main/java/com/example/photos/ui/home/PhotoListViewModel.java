@@ -42,6 +42,22 @@ public class PhotoListViewModel extends ViewModel {
     private PhotoCategory currentCategory = PhotoCategory.ALL;
     private String currentQuery = "";
 
+    private static final Comparator<Photo> STABLE_PHOTO_ORDER = (a, b) -> {
+        if (a == b) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        String da = a.getCaptureDate() == null ? "" : a.getCaptureDate();
+        String db = b.getCaptureDate() == null ? "" : b.getCaptureDate();
+        int cmp = db.compareTo(da); // descending by formatted datetime
+        if (cmp != 0) return cmp;
+        long ida = parseLongSafe(a.getId());
+        long idb = parseLongSafe(b.getId());
+        if (ida != idb) return Long.compare(idb, ida); // newer ids first
+        String ua = a.getImageUrl() == null ? "" : a.getImageUrl();
+        String ub = b.getImageUrl() == null ? "" : b.getImageUrl();
+        return ub.compareTo(ua);
+    };
+
     /**
      * 初始化时加载样本数据，并生成默认 UI 状态。
      */
@@ -81,7 +97,7 @@ public class PhotoListViewModel extends ViewModel {
                 if (!canRun(mediaExecutor)) return;
                 List<Photo> media = mapAssets(assets);
                 if (media != null) {
-                    media.sort(Comparator.comparing(Photo::getCaptureDate, String::compareTo).reversed());
+                    media.sort(STABLE_PHOTO_ORDER);
                     baseline = media;
                     mediaLoaded.set(true);
                     if (canRun(filterExecutor)) {
@@ -110,7 +126,7 @@ public class PhotoListViewModel extends ViewModel {
                     if (!canRun(mediaExecutor)) return;
                     List<Photo> media = mediaStoreRepository.loadAll(context);
                     if (media != null) {
-                        media.sort(Comparator.comparing(Photo::getCaptureDate, String::compareTo).reversed());
+                        media.sort(STABLE_PHOTO_ORDER);
                         baseline = media;
                     }
                     mediaLoaded.set(true);
@@ -194,7 +210,7 @@ public class PhotoListViewModel extends ViewModel {
                 out.add(p);
             }
         }
-        out.sort(Comparator.comparing(Photo::getCaptureDate, String::compareTo).reversed());
+        out.sort(STABLE_PHOTO_ORDER);
         return out;
     }
 
@@ -218,6 +234,15 @@ public class PhotoListViewModel extends ViewModel {
         cleared.set(true);
         mediaExecutor.shutdownNow();
         filterExecutor.shutdownNow();
+    }
+
+    private static long parseLongSafe(String v) {
+        if (v == null) return 0L;
+        try {
+            return Long.parseLong(v);
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
     }
 
     private boolean canRun(ExecutorService executor) {
