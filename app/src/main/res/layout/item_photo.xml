@@ -30,12 +30,12 @@
         app:layout_constraintEnd_toEndOf="@id/photoImageView" />
 
     <ImageView
-        android:id="@+id/photoSelectedCheck"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
+        android:id="@+id/photoSelectionBox"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
         android:layout_marginTop="8dp"
         android:layout_marginEnd="8dp"
-        android:src="@drawable/ic_check_circle_filled"
+        android:src="@drawable/photo_select_box"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="@id/photoImageView"
         app:layout_constraintEnd_toEndOf="@id/photoImageView" />

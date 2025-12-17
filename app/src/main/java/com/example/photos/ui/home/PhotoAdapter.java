@@ -97,6 +97,65 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return selectedKeys.size();
     }
 
+    public int getSelectableCount() {
+        if (timelineMode) {
+            int count = 0;
+            for (TimelineEntry e : timelineItems) {
+                if (e != null && e.type == TYPE_PHOTO && e.photo != null) count++;
+            }
+            return count;
+        }
+        return items.size();
+    }
+
+    @NonNull
+    public List<Photo> getSelectedPhotos() {
+        List<Photo> out = new ArrayList<>();
+        if (selectedKeys.isEmpty()) return out;
+        if (timelineMode) {
+            for (TimelineEntry e : timelineItems) {
+                if (e == null || e.type != TYPE_PHOTO || e.photo == null) continue;
+                if (selectedKeys.contains(keyOf(e.photo))) {
+                    out.add(e.photo);
+                }
+            }
+            return out;
+        }
+        for (Photo p : items) {
+            if (p == null) continue;
+            if (selectedKeys.contains(keyOf(p))) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    public void toggleSelectAll() {
+        if (!selectionMode) return;
+        int total = getSelectableCount();
+        if (total <= 0) return;
+        if (getSelectedCount() >= total) {
+            selectedKeys.clear();
+            notifyDataSetChanged();
+            return;
+        }
+        selectedKeys.clear();
+        if (timelineMode) {
+            for (TimelineEntry e : timelineItems) {
+                if (e == null || e.type != TYPE_PHOTO || e.photo == null) continue;
+                String key = keyOf(e.photo);
+                if (!key.isEmpty()) selectedKeys.add(key);
+            }
+        } else {
+            for (Photo p : items) {
+                if (p == null) continue;
+                String key = keyOf(p);
+                if (!key.isEmpty()) selectedKeys.add(key);
+            }
+        }
+        notifyDataSetChanged();
+    }
+
     public void clearSelection() {
         if (selectedKeys.isEmpty()) return;
         selectedKeys.clear();
@@ -331,19 +390,22 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         private final ShapeableImageView photoImageView;
         private final View selectedScrim;
-        private final ImageView selectedCheck;
+        private final ImageView selectionBox;
 
         PhotoViewHolder(@NonNull View itemView) {
             super(itemView);
             photoImageView = itemView.findViewById(R.id.photoImageView);
             selectedScrim = itemView.findViewById(R.id.photoSelectedScrim);
-            selectedCheck = itemView.findViewById(R.id.photoSelectedCheck);
+            selectionBox = itemView.findViewById(R.id.photoSelectionBox);
         }
 
         void bind(Photo photo) {
             boolean selected = selectionMode && selectedKeys.contains(keyOf(photo));
             if (selectedScrim != null) selectedScrim.setVisibility(selected ? View.VISIBLE : View.GONE);
-            if (selectedCheck != null) selectedCheck.setVisibility(selected ? View.VISIBLE : View.GONE);
+            if (selectionBox != null) {
+                selectionBox.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
+                selectionBox.setSelected(selected);
+            }
             applyPrivacyAndLoadImage(photo);
             preloadNext(position());
 

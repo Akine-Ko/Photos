@@ -153,6 +153,26 @@ public class CategoryPhotosFragment extends Fragment {
         });
     }
 
+    public void setMultiSelectEnabled(boolean enabled) {
+        if (adapter == null) return;
+        adapter.setSelectionMode(enabled);
+    }
+
+    public boolean isMultiSelectEnabled() {
+        return adapter != null && adapter.isSelectionMode();
+    }
+
+    public void toggleSelectAll() {
+        if (adapter == null) return;
+        adapter.toggleSelectAll();
+    }
+
+    @NonNull
+    public List<Photo> getSelectedPhotos() {
+        if (adapter == null) return new ArrayList<>();
+        return adapter.getSelectedPhotos();
+    }
+
     private void openAlbumViewer(@NonNull Photo photo) {
         if (!isAdded()) return;
         ViewerPayload payload = buildPayload(photo);

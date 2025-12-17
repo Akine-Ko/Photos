@@ -9,4 +9,5 @@
     android:paddingBottom="12dp"
     android:textColor="@color/brand_on_surface"
     android:textSize="16sp"
+    android:textStyle="bold"
     android:background="?attr/selectableItemBackground" />

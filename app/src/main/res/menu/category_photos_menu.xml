@@ -14,4 +14,9 @@
         android:title="@string/album_clear_records"
         app:showAsAction="always" />
 
+    <item
+        android:id="@+id/action_cancel_selection"
+        android:title="@string/cancel"
+        app:showAsAction="always" />
+
 </menu>
