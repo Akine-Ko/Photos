@@ -146,14 +146,26 @@ public class AlbumViewerActivity extends AppCompatActivity {
         View.OnClickListener deleteClickListener = v -> deleteCurrent();
         View.OnClickListener editClickListener = v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show();
         View.OnClickListener addToClickListener = v -> Toast.makeText(this, R.string.add_to, Toast.LENGTH_SHORT).show();
-        shareButton.setOnClickListener(shareClickListener);
-        if (shareButtonContainer != null) shareButtonContainer.setOnClickListener(shareClickListener);
-        deleteButton.setOnClickListener(deleteClickListener);
-        if (deleteButtonContainer != null) deleteButtonContainer.setOnClickListener(deleteClickListener);
-        editButton.setOnClickListener(editClickListener);
-        if (editButtonContainer != null) editButtonContainer.setOnClickListener(editClickListener);
-        addToButton.setOnClickListener(addToClickListener);
-        if (addToButtonContainer != null) addToButtonContainer.setOnClickListener(addToClickListener);
+        if (shareButtonContainer != null) {
+            shareButtonContainer.setOnClickListener(shareClickListener);
+        } else {
+            shareButton.setOnClickListener(shareClickListener);
+        }
+        if (deleteButtonContainer != null) {
+            deleteButtonContainer.setOnClickListener(deleteClickListener);
+        } else {
+            deleteButton.setOnClickListener(deleteClickListener);
+        }
+        if (editButtonContainer != null) {
+            editButtonContainer.setOnClickListener(editClickListener);
+        } else {
+            editButton.setOnClickListener(editClickListener);
+        }
+        if (addToButtonContainer != null) {
+            addToButtonContainer.setOnClickListener(addToClickListener);
+        } else {
+            addToButton.setOnClickListener(addToClickListener);
+        }
         infoButton.setOnClickListener(v -> showInfoForCurrent());
 
         ArrayList<String> urls = getIntent().getStringArrayListExtra(EXTRA_URLS);
