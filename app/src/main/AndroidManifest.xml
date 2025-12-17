@@ -42,6 +42,9 @@
             android:name="com.example.photos.ui.albums.AlbumViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+        <activity
+            android:name="com.example.photos.ui.albums.CategoryPhotosActivity"
+            android:exported="false" />
 
         <!-- Ensure WorkManager foreground service declares required types on Android 14+ -->
         <service

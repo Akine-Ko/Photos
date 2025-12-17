@@ -11,8 +11,6 @@ import android.graphics.drawable.ColorDrawable;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -87,10 +85,10 @@ public class AlbumsFragment extends Fragment {
         albumsAdapter = new AlbumsAdapter(new AlbumsAdapter.OnAlbumActionListener() {
             @Override
             public void onAlbumClick(SmartAlbum album) {
-                NavController nav = Navigation.findNavController(view);
-                Bundle args = new Bundle();
-                args.putString(CategoryPhotosFragment.ARG_CATEGORY, album.getTitle());
-                nav.navigate(R.id.action_albums_to_categoryPhotos, args);
+                android.content.Intent intent = new android.content.Intent(requireContext(), CategoryPhotosActivity.class);
+                intent.putExtra(CategoryPhotosActivity.EXTRA_CATEGORY, album.getTitle());
+                startActivity(intent);
+                requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
             }
 
             @Override
