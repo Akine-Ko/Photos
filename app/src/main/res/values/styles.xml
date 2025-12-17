@@ -12,4 +12,9 @@
     <style name="ShapeAppearance.Photos.RoundedSmall" parent="@style/ShapeAppearance.MaterialComponents.MediumComponent">
         <item name="cornerSize">8dp</item>
     </style>
+
+    <style name="BottomDialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/dialog_slide_in_bottom</item>
+        <item name="android:windowExitAnimation">@anim/dialog_slide_out_bottom</item>
+    </style>
 </resources>

@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -413,9 +414,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 .setView(dialogView)
                 .setCancelable(true)
                 .create();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        }
         if (positive != null) {
             positive.setText(R.string.delete_confirm_positive);
             positive.setOnClickListener(v -> {
@@ -428,6 +426,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
             negative.setOnClickListener(v -> dialog.dismiss());
         }
         dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setGravity(Gravity.BOTTOM);
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setWindowAnimations(R.style.BottomDialogAnimation);
+            android.view.WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
+            lp.y = (int) (getResources().getDisplayMetrics().density * 48); // offset upward a bit above bottom
+            dialog.getWindow().setAttributes(lp);
+        }
     }
 
     private void performDelete(@NonNull PhotoEntry entry, @NonNull Uri uri, int position) {
