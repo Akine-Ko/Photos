@@ -36,8 +36,6 @@ public class AlbumsFragment extends Fragment {
     private AlbumsAdapter albumsAdapter;
     private TextView emptyTextView;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private View addButton;
-    private View multiSelectButton;
     private static final List<String> PRIORITY_ORDER = Arrays.asList(
             "SELFIE",
             "GROUP",
@@ -65,13 +63,10 @@ public class AlbumsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         emptyTextView = view.findViewById(R.id.albumsEmptyTextView);
         swipeRefreshLayout = view.findViewById(R.id.albumsSwipeRefresh);
-        addButton = view.findViewById(R.id.albumsAddButton);
-        multiSelectButton = view.findViewById(R.id.albumsMultiSelectButton);
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setColorSchemeResources(R.color.brand_primary);
         }
         setupRecyclerView(view);
-        setupActions();
         android.content.Context app = requireContext().getApplicationContext();
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setOnRefreshListener(() -> renderAlbumsAsync(app));
@@ -246,16 +241,6 @@ public class AlbumsFragment extends Fragment {
         });
     }
 
-    private void setupActions() {
-        if (addButton != null) {
-            addButton.setOnClickListener(v -> promptAddAlbum());
-        }
-        if (multiSelectButton != null) {
-            multiSelectButton.setOnClickListener(v ->
-                    android.widget.Toast.makeText(requireContext(), "多选模式即将开放", android.widget.Toast.LENGTH_SHORT).show());
-        }
-    }
-
     private void promptAddAlbum() {
         android.view.LayoutInflater inflater = android.view.LayoutInflater.from(requireContext());
         android.view.View dialogView = inflater.inflate(R.layout.dialog_add_album, null, false);
@@ -285,5 +270,15 @@ public class AlbumsFragment extends Fragment {
             }
         });
         dialog.show();
+    }
+
+    public void onAddAlbumAction() {
+        if (!isAdded()) return;
+        promptAddAlbum();
+    }
+
+    public void onMultiSelectAction() {
+        if (!isAdded()) return;
+        android.widget.Toast.makeText(requireContext(), "多选模式即将开放", android.widget.Toast.LENGTH_SHORT).show();
     }
 }

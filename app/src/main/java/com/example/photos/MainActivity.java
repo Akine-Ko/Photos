@@ -2,6 +2,8 @@ package com.example.photos;
 
 import android.os.Bundle;
 import android.view.View;
+import android.view.Menu;
+import android.view.MenuItem;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,8 +16,8 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.example.photos.sync.MediaSyncScheduler;
-import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.appbar.MaterialToolbar;
 
 /**
  * 顶层容器 Activity：负责挂载导航宿主并串联顶部工具栏与底部导航。
@@ -24,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private NavController navController;
+    private int currentDestinationId = 0;
 
     private com.example.photos.media.MediaSyncManager syncManager;
     private boolean permissionRequestedOnce = false;
@@ -102,7 +105,68 @@ public class MainActivity extends AppCompatActivity {
         });
         NavigationUI.setupWithNavController(bottomNavigationView, navController);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
+
+        navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            currentDestinationId = destination.getId();
+            invalidateOptionsMenu();
+
+            if (destination.getId() == R.id.navigation_category_photos && arguments != null) {
+                String cat = arguments.getString(com.example.photos.ui.albums.CategoryPhotosFragment.ARG_CATEGORY);
+                if (cat != null && !cat.trim().isEmpty()) {
+                    topAppBar.setTitle(com.example.photos.ui.albums.CategoryDisplay.displayOf(cat));
+                    return;
+                }
+            }
+            CharSequence label = destination.getLabel();
+            topAppBar.setTitle(label == null ? "" : label);
+        });
+
         ViewCompat.requestApplyInsets(root);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.top_app_bar_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem add = menu.findItem(R.id.action_add_album);
+        MenuItem multi = menu.findItem(R.id.action_multi_select);
+        boolean onAlbums = currentDestinationId == R.id.navigation_albums;
+        if (add != null) add.setVisible(onAlbums);
+        if (multi != null) multi.setVisible(onAlbums);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_add_album) {
+            com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+            if (fragment != null) {
+                fragment.onAddAlbumAction();
+                return true;
+            }
+        } else if (id == R.id.action_multi_select) {
+            com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+            if (fragment != null) {
+                fragment.onMultiSelectAction();
+                return true;
+            }
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private com.example.photos.ui.albums.AlbumsFragment currentAlbumsFragment() {
+        androidx.fragment.app.Fragment host = getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+        if (!(host instanceof NavHostFragment)) return null;
+        androidx.fragment.app.Fragment current = ((NavHostFragment) host).getChildFragmentManager().getPrimaryNavigationFragment();
+        if (current instanceof com.example.photos.ui.albums.AlbumsFragment) {
+            return (com.example.photos.ui.albums.AlbumsFragment) current;
+        }
+        return null;
     }
 
     @Override

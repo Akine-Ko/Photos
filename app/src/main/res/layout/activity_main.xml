@@ -8,7 +8,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!-- 顶部应用栏：配合 AppBarConfiguration 管理标题与返回键 -->
+    <!-- 顶部栏：展示页面标题（不再居中） -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/topAppBar"
         android:layout_width="0dp"
@@ -19,9 +19,10 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:title="智能相册"
+        app:titleCentered="false"
         app:navigationIconTint="@color/brand_on_surface"
-        app:titleCentered="true"/>
+        app:titleTextColor="@color/brand_on_surface"
+        app:titleTextAppearance="@style/TopBarTitle" />
 
     <!-- Navigation 宿主，用于切换首页/智能分类/我的 -->
     <androidx.fragment.app.FragmentContainerView

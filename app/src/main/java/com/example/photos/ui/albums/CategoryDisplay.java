@@ -7,7 +7,7 @@ import java.util.Map;
 /**
  * Maps internal category keys to localized display names.
  */
-final class CategoryDisplay {
+public final class CategoryDisplay {
     private static final Map<String, String> MAP = new HashMap<>();
 
     static {
@@ -37,7 +37,7 @@ final class CategoryDisplay {
 
     private CategoryDisplay() {}
 
-    static String displayOf(String key) {
+    public static String displayOf(String key) {
         if (key == null) return "";
         String k = key.toUpperCase(Locale.ROOT);
         if (k.startsWith("AUTO_CLUSTER_")) {
