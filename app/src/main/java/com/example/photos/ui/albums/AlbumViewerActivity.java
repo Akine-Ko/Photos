@@ -101,9 +101,13 @@ public class AlbumViewerActivity extends AppCompatActivity {
         bottomBasePaddingBottom = bottomPanel.getPaddingBottom();
         ImageButton backButton = findViewById(R.id.albumViewerBackButton);
         ImageButton shareButton = findViewById(R.id.albumViewerShareButton);
+        View shareButtonContainer = findViewById(R.id.albumViewerShareButtonContainer);
         ImageButton deleteButton = findViewById(R.id.albumViewerDeleteButton);
+        View deleteButtonContainer = findViewById(R.id.albumViewerDeleteButtonContainer);
         ImageButton editButton = findViewById(R.id.albumViewerEditButton);
+        View editButtonContainer = findViewById(R.id.albumViewerEditButtonContainer);
         ImageButton addToButton = findViewById(R.id.albumViewerAddToButton);
+        View addToButtonContainer = findViewById(R.id.albumViewerAddToButtonContainer);
         ImageButton infoButton = findViewById(R.id.albumViewerInfoButton);
         RecyclerView thumbRecyclerView = findViewById(R.id.albumViewerThumbRecyclerView);
         View root = findViewById(R.id.albumViewerRoot);
@@ -138,10 +142,18 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 });
 
         backButton.setOnClickListener(v -> finishWithResult());
-        shareButton.setOnClickListener(v -> shareCurrent());
-        deleteButton.setOnClickListener(v -> deleteCurrent());
-        editButton.setOnClickListener(v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show());
-        addToButton.setOnClickListener(v -> Toast.makeText(this, R.string.add_to, Toast.LENGTH_SHORT).show());
+        View.OnClickListener shareClickListener = v -> shareCurrent();
+        View.OnClickListener deleteClickListener = v -> deleteCurrent();
+        View.OnClickListener editClickListener = v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show();
+        View.OnClickListener addToClickListener = v -> Toast.makeText(this, R.string.add_to, Toast.LENGTH_SHORT).show();
+        shareButton.setOnClickListener(shareClickListener);
+        if (shareButtonContainer != null) shareButtonContainer.setOnClickListener(shareClickListener);
+        deleteButton.setOnClickListener(deleteClickListener);
+        if (deleteButtonContainer != null) deleteButtonContainer.setOnClickListener(deleteClickListener);
+        editButton.setOnClickListener(editClickListener);
+        if (editButtonContainer != null) editButtonContainer.setOnClickListener(editClickListener);
+        addToButton.setOnClickListener(addToClickListener);
+        if (addToButtonContainer != null) addToButtonContainer.setOnClickListener(addToClickListener);
         infoButton.setOnClickListener(v -> showInfoForCurrent());
 
         ArrayList<String> urls = getIntent().getStringArrayListExtra(EXTRA_URLS);
