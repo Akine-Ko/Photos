@@ -35,7 +35,7 @@
     <string name="album_add_new">新建相册</string>
     <string name="album_add_success">已添加到“%1$s”</string>
     <string name="album_add_failed">添加失败，请稍后重试</string>
-    <string name="album_delete_confirm_message">将移除相册“%1$s”的记录，是否继续？</string>
+    <string name="album_delete_confirm_message">将移除相册“%1$s”，是否继续？</string>
     <string name="album_delete_confirm_positive">删除</string>
     <string name="ok">确定</string>
     <string name="cancel">取消</string>

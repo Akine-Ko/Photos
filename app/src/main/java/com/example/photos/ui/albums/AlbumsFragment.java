@@ -212,7 +212,7 @@ public class AlbumsFragment extends Fragment {
                 .setCancelable(true)
                 .create();
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
         if (negative != null) {
             negative.setText(R.string.delete_confirm_negative);
@@ -222,21 +222,28 @@ public class AlbumsFragment extends Fragment {
             positive.setText(R.string.album_delete_confirm_positive);
             positive.setOnClickListener(v -> {
                 dialog.dismiss();
-                java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
-                    try {
-                        com.example.photos.db.PhotosDb.get(requireContext()).categoryDao().deleteByCategory(album.getTitle());
-                    } catch (Throwable ignore) {}
-                    android.app.Activity activity = getActivity();
-                    if (activity == null || !isAdded()) return;
-                    activity.runOnUiThread(() -> {
-                        android.content.Context app = requireContext().getApplicationContext();
-                        renderAlbumsAsync(app);
-                        android.widget.Toast.makeText(requireContext(), "已删除相册：" + displayName, android.widget.Toast.LENGTH_SHORT).show();
-                    });
-                });
+                deleteAlbum(album.getTitle(), displayName);
             });
         }
         dialog.show();
+    }
+
+    private void deleteAlbum(@NonNull String title, @NonNull String displayName) {
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                com.example.photos.db.PhotosDb.get(requireContext()).categoryDao().deleteByCategory(title);
+                CustomAlbumsStore.remove(requireContext().getApplicationContext(), title);
+            } catch (Throwable ignore) {}
+            android.app.Activity activity = getActivity();
+            if (activity == null || !isAdded()) return;
+            activity.runOnUiThread(() -> {
+                android.content.Context app = requireContext().getApplicationContext();
+                renderAlbumsAsync(app);
+                android.widget.Toast.makeText(requireContext(),
+                        "已删除相册：" + displayName,
+                        android.widget.Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
     private void setupActions() {

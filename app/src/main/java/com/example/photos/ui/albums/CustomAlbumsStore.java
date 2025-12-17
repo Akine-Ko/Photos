@@ -85,6 +85,23 @@ final class CustomAlbumsStore {
         return true;
     }
 
+    static void remove(Context context, String name) {
+        if (context == null || name == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        List<AlbumMeta> metas = loadAllWithMeta(context);
+        boolean changed = false;
+        for (int i = metas.size() - 1; i >= 0; i--) {
+            AlbumMeta m = metas.get(i);
+            if (m != null && name.equalsIgnoreCase(m.name)) {
+                metas.remove(i);
+                changed = true;
+            }
+        }
+        if (changed) {
+            persist(prefs, metas);
+        }
+    }
+
     private static void persist(@NonNull SharedPreferences prefs, @NonNull List<AlbumMeta> metas) {
         try {
             JSONArray arr = new JSONArray();
