@@ -18,4 +18,26 @@
         app:layout_constraintTop_toTopOf="parent"
         app:shapeAppearanceOverlay="@style/ShapeAppearance.Photos.RoundedSmall" />
 
+    <View
+        android:id="@+id/photoSelectedScrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#33000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/photoImageView"
+        app:layout_constraintBottom_toBottomOf="@id/photoImageView"
+        app:layout_constraintStart_toStartOf="@id/photoImageView"
+        app:layout_constraintEnd_toEndOf="@id/photoImageView" />
+
+    <ImageView
+        android:id="@+id/photoSelectedCheck"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:src="@drawable/ic_check_circle_filled"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/photoImageView"
+        app:layout_constraintEnd_toEndOf="@id/photoImageView" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

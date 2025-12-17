@@ -44,7 +44,8 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
         <activity
             android:name="com.example.photos.ui.albums.CategoryPhotosActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:label="@string/title_albums" />
 
         <!-- Ensure WorkManager foreground service declares required types on Android 14+ -->
         <service

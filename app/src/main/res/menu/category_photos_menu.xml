@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_multi_select"
+        android:icon="@drawable/ic_select_multi"
+        android:title="@string/albums_multi_select"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_clear_category_records"
+        android:icon="@drawable/ic_select_clear"
+        android:title="@string/album_clear_records"
+        app:showAsAction="always" />
+
+</menu>

@@ -45,6 +45,7 @@ public class CategoryPhotosFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        viewDestroyed = false;
         Bundle args = getArguments();
         category = args == null ? null : args.getString(ARG_CATEGORY);
         viewerLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -73,6 +74,22 @@ public class CategoryPhotosFragment extends Fragment {
         super.onDestroyView();
     }
 
+    public boolean toggleMultiSelect() {
+        if (adapter == null) return false;
+        boolean enabled = !adapter.isSelectionMode();
+        adapter.setSelectionMode(enabled);
+        return enabled;
+    }
+
+    public void reload() {
+        if (!isAdded()) return;
+        if (adapter != null) {
+            adapter.setSelectionMode(false);
+        }
+        android.content.Context app = requireContext().getApplicationContext();
+        loadDataAsync(app);
+    }
+
     private void filterDeleted(List<String> deletedIds) {
         boolean changed = false;
         for (int i = currentPhotos.size() - 1; i >= 0; i--) {
@@ -97,6 +114,17 @@ public class CategoryPhotosFragment extends Fragment {
                     String last = android.net.Uri.parse(key).getLastPathSegment();
                     ids.add(Long.parseLong(last));
                 } catch (Throwable ignore) {}
+            }
+            if (ids.isEmpty()) {
+                android.app.Activity activity = getActivity();
+                if (activity == null || !isAdded() || viewDestroyed) return;
+                activity.runOnUiThread(() -> {
+                    if (!viewDestroyed && adapter != null) {
+                        currentPhotos.clear();
+                        adapter.submitList(new ArrayList<>());
+                    }
+                });
+                return;
             }
 
             List<Photo> acc = new ArrayList<>();

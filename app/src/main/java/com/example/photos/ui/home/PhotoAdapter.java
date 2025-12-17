@@ -24,8 +24,10 @@ import com.google.android.material.imageview.ShapeableImageView;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,6 +54,8 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private final boolean timelineMode;
     private List<Photo> currentTimelinePhotos = Collections.emptyList();
     private HomeOverview overview;
+    private boolean selectionMode = false;
+    private final Set<String> selectedKeys = new HashSet<>();
     private final Executor diffExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicInteger diffGeneration = new AtomicInteger(0);
@@ -74,6 +78,47 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.clickListener = clickListener;
         this.timelineMode = timelineMode;
         setHasStableIds(true);
+    }
+
+    public void setSelectionMode(boolean enabled) {
+        if (this.selectionMode == enabled) return;
+        this.selectionMode = enabled;
+        if (!enabled) {
+            selectedKeys.clear();
+        }
+        notifyDataSetChanged();
+    }
+
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+
+    public int getSelectedCount() {
+        return selectedKeys.size();
+    }
+
+    public void clearSelection() {
+        if (selectedKeys.isEmpty()) return;
+        selectedKeys.clear();
+        notifyDataSetChanged();
+    }
+
+    private String keyOf(@NonNull Photo photo) {
+        String id = photo.getId();
+        if (id != null && !id.isEmpty()) return id;
+        String url = photo.getImageUrl();
+        return url == null ? "" : url;
+    }
+
+    private boolean toggleSelected(@NonNull Photo photo) {
+        String key = keyOf(photo);
+        if (key.isEmpty()) return false;
+        if (selectedKeys.contains(key)) {
+            selectedKeys.remove(key);
+            return false;
+        }
+        selectedKeys.add(key);
+        return true;
     }
 
     public boolean isFullWidthPosition(int position) {
@@ -285,17 +330,34 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     class PhotoViewHolder extends RecyclerView.ViewHolder {
 
         private final ShapeableImageView photoImageView;
+        private final View selectedScrim;
+        private final ImageView selectedCheck;
 
         PhotoViewHolder(@NonNull View itemView) {
             super(itemView);
             photoImageView = itemView.findViewById(R.id.photoImageView);
+            selectedScrim = itemView.findViewById(R.id.photoSelectedScrim);
+            selectedCheck = itemView.findViewById(R.id.photoSelectedCheck);
         }
 
         void bind(Photo photo) {
+            boolean selected = selectionMode && selectedKeys.contains(keyOf(photo));
+            if (selectedScrim != null) selectedScrim.setVisibility(selected ? View.VISIBLE : View.GONE);
+            if (selectedCheck != null) selectedCheck.setVisibility(selected ? View.VISIBLE : View.GONE);
             applyPrivacyAndLoadImage(photo);
             preloadNext(position());
 
             itemView.setOnClickListener(v -> {
+                if (selectionMode) {
+                    toggleSelected(photo);
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        notifyItemChanged(pos);
+                    } else {
+                        notifyDataSetChanged();
+                    }
+                    return;
+                }
                 if (clickListener != null) {
                     clickListener.onPhotoClick(photo);
                 }
