@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -14,6 +16,8 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.photos.R;
 import com.example.photos.model.PhotoCategory;
@@ -21,7 +25,11 @@ import com.example.photos.model.SmartAlbum;
 import com.example.photos.ui.common.GridSpacingItemDecoration;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 public class AlbumsFragment extends Fragment {
 
@@ -30,6 +38,20 @@ public class AlbumsFragment extends Fragment {
     private SwipeRefreshLayout swipeRefreshLayout;
     private View addButton;
     private View multiSelectButton;
+    private static final List<String> PRIORITY_ORDER = Arrays.asList(
+            "SELFIE",
+            "GROUP",
+            "QRCODE",
+            "CARD",
+            "TEXT",
+            "NATURE",
+            "DRAWING",
+            "ARCHITECTURE",
+            "PLANTS",
+            "FOOD",
+            "ELECTRONICS",
+            "PETS"
+    );
 
     @Nullable
     @Override
@@ -78,26 +100,7 @@ public class AlbumsFragment extends Fragment {
 
             @Override
             public void onAlbumLongClick(SmartAlbum album) {
-                // 长按删除该相册（分类）
-                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                        .setTitle("删除相册")
-                        .setMessage("将移除分类 ‘" + album.getTitle() + "’ 的记录，是否继续？")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("删除", (d, which) -> {
-                            java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
-                                try {
-                                    com.example.photos.db.PhotosDb.get(requireContext()).categoryDao().deleteByCategory(album.getTitle());
-                                } catch (Throwable ignore) {}
-                                android.app.Activity activity = getActivity();
-                                if (activity == null || !isAdded()) return;
-                                activity.runOnUiThread(() -> {
-                                    android.content.Context app = requireContext().getApplicationContext();
-                                    renderAlbumsAsync(app);
-                                    android.widget.Toast.makeText(requireContext(), "已删除相册：" + album.getTitle(), android.widget.Toast.LENGTH_SHORT).show();
-                                });
-                            });
-                        })
-                        .show();
+                showDeleteAlbumDialog(album);
             }
         });
         final int spanCount = 4;
@@ -121,29 +124,47 @@ public class AlbumsFragment extends Fragment {
                 com.example.photos.db.CategoryDao dao = com.example.photos.db.PhotosDb.get(appContext).categoryDao();
                 List<com.example.photos.db.CategoryDao.CategoryCount> counts = dao.countsByCategory();
                 java.util.Set<String> existing = new java.util.HashSet<>();
+                List<SmartAlbum> categoryAlbums = new ArrayList<>();
                 for (com.example.photos.db.CategoryDao.CategoryCount c : counts) {
                     if (c == null || c.category == null) continue;
-                    existing.add(c.category);
-                    String cover = dao.latestKeyForCategory(c.category);
+                    String cat = c.category.trim();
+                    if (cat.isEmpty()) continue;
+                    existing.add(cat.toUpperCase());
+                    String cover = dao.latestKeyForCategory(cat);
                     if (cover == null) cover = "";
-                    albums.add(new SmartAlbum(
+                    categoryAlbums.add(new SmartAlbum(
                             PhotoCategory.ALL,
-                            c.category,
+                            cat,
                             "自动聚类",
                             "本地分类已就绪，点击查看样本",
                             cover,
                             c.cnt
                     ));
                 }
-                // Append user-created empty albums (if not already existing)
-                List<String> custom = CustomAlbumsStore.loadAll(appContext);
+                Map<String, Integer> priorityIndex = new HashMap<>();
+                for (int i = 0; i < PRIORITY_ORDER.size(); i++) {
+                    priorityIndex.put(PRIORITY_ORDER.get(i), i);
+                }
+                categoryAlbums.sort((a, b) -> {
+                    String ta = a.getTitle() == null ? "" : a.getTitle().toUpperCase();
+                    String tb = b.getTitle() == null ? "" : b.getTitle().toUpperCase();
+                    int ia = priorityIndex.getOrDefault(ta, Integer.MAX_VALUE);
+                    int ib = priorityIndex.getOrDefault(tb, Integer.MAX_VALUE);
+                    if (ia != ib) return Integer.compare(ia, ib);
+                    return ta.compareTo(tb);
+                });
+                albums.addAll(categoryAlbums);
+
+                List<CustomAlbumsStore.AlbumMeta> custom = CustomAlbumsStore.loadAllWithMeta(appContext);
                 if (custom != null) {
-                    for (String name : custom) {
-                        if (name == null || name.trim().isEmpty()) continue;
-                        if (existing.contains(name)) continue;
+                    // Oldest created first
+                    custom.sort(Comparator.comparingLong(m -> m.createdAt));
+                    for (CustomAlbumsStore.AlbumMeta meta : custom) {
+                        if (meta == null || meta.name == null || meta.name.trim().isEmpty()) continue;
+                        if (existing.contains(meta.name.trim().toUpperCase())) continue;
                         albums.add(new SmartAlbum(
                                 PhotoCategory.ALL,
-                                name,
+                                meta.name,
                                 "自定义相册",
                                 "",
                                 "",
@@ -174,6 +195,48 @@ public class AlbumsFragment extends Fragment {
                 }
             });
         });
+    }
+
+    private void showDeleteAlbumDialog(@NonNull SmartAlbum album) {
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_delete_confirm, null, false);
+        TextView message = dialogView.findViewById(R.id.deleteConfirmMessage);
+        AppCompatButton positive = dialogView.findViewById(R.id.deleteConfirmPositive);
+        AppCompatButton negative = dialogView.findViewById(R.id.deleteConfirmNegative);
+        String displayName = CategoryDisplay.displayOf(album.getTitle());
+        if (message != null) {
+            message.setText(getString(R.string.album_delete_confirm_message, displayName));
+        }
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        if (negative != null) {
+            negative.setText(R.string.delete_confirm_negative);
+            negative.setOnClickListener(v -> dialog.dismiss());
+        }
+        if (positive != null) {
+            positive.setText(R.string.album_delete_confirm_positive);
+            positive.setOnClickListener(v -> {
+                dialog.dismiss();
+                java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+                    try {
+                        com.example.photos.db.PhotosDb.get(requireContext()).categoryDao().deleteByCategory(album.getTitle());
+                    } catch (Throwable ignore) {}
+                    android.app.Activity activity = getActivity();
+                    if (activity == null || !isAdded()) return;
+                    activity.runOnUiThread(() -> {
+                        android.content.Context app = requireContext().getApplicationContext();
+                        renderAlbumsAsync(app);
+                        android.widget.Toast.makeText(requireContext(), "已删除相册：" + displayName, android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                });
+            });
+        }
+        dialog.show();
     }
 
     private void setupActions() {
