@@ -24,6 +24,28 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
+        <View
+            android:id="@+id/albumSelectedScrim"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#33000000"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/albumCoverImageView"
+            app:layout_constraintBottom_toBottomOf="@id/albumCoverImageView"
+            app:layout_constraintStart_toStartOf="@id/albumCoverImageView"
+            app:layout_constraintEnd_toEndOf="@id/albumCoverImageView" />
+
+        <ImageView
+            android:id="@+id/albumSelectionBox"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/photo_select_box"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/albumCoverImageView"
+            app:layout_constraintStart_toStartOf="@id/albumCoverImageView" />
+
         <TextView
             android:id="@+id/albumCountTextView"
             android:layout_width="wrap_content"

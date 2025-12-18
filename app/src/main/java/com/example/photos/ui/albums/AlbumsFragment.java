@@ -93,7 +93,13 @@ public class AlbumsFragment extends Fragment {
 
             @Override
             public void onAlbumLongClick(SmartAlbum album) {
-                showDeleteAlbumDialog(album);
+                if (!isAdded()) return;
+                android.app.Activity activity = getActivity();
+                if (activity instanceof com.example.photos.MainActivity) {
+                    ((com.example.photos.MainActivity) activity).enterAlbumsSelectionModeAndSelect(album);
+                } else {
+                    showDeleteAlbumDialog(album);
+                }
             }
         });
         final int spanCount = 4;
@@ -277,6 +283,36 @@ public class AlbumsFragment extends Fragment {
 
     public void onMultiSelectAction() {
         if (!isAdded()) return;
-        android.widget.Toast.makeText(requireContext(), "多选模式即将开放", android.widget.Toast.LENGTH_SHORT).show();
+        setMultiSelectEnabled(true);
+    }
+
+    public void setMultiSelectEnabled(boolean enabled) {
+        if (albumsAdapter == null) return;
+        albumsAdapter.setSelectionMode(enabled);
+    }
+
+    public boolean isMultiSelectEnabled() {
+        return albumsAdapter != null && albumsAdapter.isSelectionMode();
+    }
+
+    public void toggleSelectAll() {
+        if (albumsAdapter == null) return;
+        albumsAdapter.toggleSelectAll();
+    }
+
+    @NonNull
+    public List<SmartAlbum> getSelectedAlbums() {
+        if (albumsAdapter == null) return new ArrayList<>();
+        return albumsAdapter.getSelectedAlbums();
+    }
+
+    public void reload() {
+        if (!isAdded()) return;
+        renderAlbumsAsync(requireContext().getApplicationContext());
+    }
+
+    public void selectAlbum(@NonNull SmartAlbum album) {
+        if (albumsAdapter == null) return;
+        albumsAdapter.selectAlbum(album);
     }
 }

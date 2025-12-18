@@ -29,6 +29,7 @@ import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.example.photos.model.SmartAlbum;
 import com.example.photos.sync.MediaSyncScheduler;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -57,7 +58,11 @@ public class MainActivity extends AppCompatActivity {
     private int selectionBottomNavBasePaddingBottom = 0;
     private TextView selectAllView;
     private TextView selectionTitleView;
-    private boolean selectionMode = false;
+
+    private static final int SELECTION_NONE = 0;
+    private static final int SELECTION_HOME = 1;
+    private static final int SELECTION_ALBUMS = 2;
+    private int selectionModeTarget = SELECTION_NONE;
 
     private ActivityResultLauncher<IntentSenderRequest> deleteLauncher;
     private ArrayList<String> pendingDeleteMediaKeys;
@@ -81,9 +86,16 @@ public class MainActivity extends AppCompatActivity {
         selectionTitleView = findViewById(R.id.mainSelectionTitle);
         if (selectAllView != null) {
             selectAllView.setOnClickListener(v -> {
-                com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
-                if (fragment != null) {
-                    fragment.toggleSelectAll();
+                if (selectionModeTarget == SELECTION_HOME) {
+                    com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
+                    if (fragment != null) {
+                        fragment.toggleSelectAll();
+                    }
+                } else if (selectionModeTarget == SELECTION_ALBUMS) {
+                    com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+                    if (fragment != null) {
+                        fragment.toggleSelectAll();
+                    }
                 }
             });
         }
@@ -162,6 +174,10 @@ public class MainActivity extends AppCompatActivity {
                     requestDeleteSelectedFromHome();
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbumFromHome();
+                } else if (id == R.id.action_delete_album) {
+                    requestDeleteSelectedAlbums();
+                } else if (id == R.id.action_clear_album_records) {
+                    requestClearSelectedAlbumRecords();
                 }
                 clearSelectionBottomNavState();
                 return false;
@@ -174,6 +190,10 @@ public class MainActivity extends AppCompatActivity {
                     requestDeleteSelectedFromHome();
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbumFromHome();
+                } else if (id == R.id.action_delete_album) {
+                    requestDeleteSelectedAlbums();
+                } else if (id == R.id.action_clear_album_records) {
+                    requestClearSelectedAlbumRecords();
                 }
                 clearSelectionBottomNavState();
             });
@@ -196,8 +216,10 @@ public class MainActivity extends AppCompatActivity {
 
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
             currentDestinationId = destination.getId();
-            if (selectionMode && currentDestinationId != R.id.navigation_home) {
-                exitHomeSelectionMode();
+            if (selectionModeTarget == SELECTION_HOME && currentDestinationId != R.id.navigation_home) {
+                exitSelectionMode();
+            } else if (selectionModeTarget == SELECTION_ALBUMS && currentDestinationId != R.id.navigation_albums) {
+                exitSelectionMode();
             }
             invalidateOptionsMenu();
 
@@ -209,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             CharSequence label = destination.getLabel();
-            if (!selectionMode) {
+            if (selectionModeTarget == SELECTION_NONE) {
                 topAppBar.setTitle(label == null ? "" : label);
             }
         });
@@ -217,8 +239,8 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (selectionMode) {
-                    exitHomeSelectionMode();
+                if (selectionModeTarget != SELECTION_NONE) {
+                    exitSelectionMode();
                     return;
                 }
                 setEnabled(false);
@@ -243,11 +265,14 @@ public class MainActivity extends AppCompatActivity {
         MenuItem cancel = menu.findItem(R.id.action_cancel_selection);
         boolean onAlbums = currentDestinationId == R.id.navigation_albums;
         boolean onHome = currentDestinationId == R.id.navigation_home;
-        if (add != null) add.setVisible(!selectionMode && onAlbums);
-        if (multi != null) multi.setVisible(!selectionMode && (onAlbums || onHome));
+        boolean selectionActive = selectionModeTarget != SELECTION_NONE;
+        boolean selectionOnHome = selectionModeTarget == SELECTION_HOME && onHome;
+        boolean selectionOnAlbums = selectionModeTarget == SELECTION_ALBUMS && onAlbums;
+        if (add != null) add.setVisible(!selectionActive && onAlbums);
+        if (multi != null) multi.setVisible(!selectionActive && (onAlbums || onHome));
         if (cancel != null) {
-            cancel.setVisible(selectionMode && onHome);
-            if (selectionMode && onHome) {
+            cancel.setVisible(selectionOnHome || selectionOnAlbums);
+            if (selectionOnHome || selectionOnAlbums) {
                 tintMenuItemBlue(cancel);
             }
         }
@@ -267,15 +292,12 @@ public class MainActivity extends AppCompatActivity {
             if (currentDestinationId == R.id.navigation_home) {
                 enterHomeSelectionMode();
                 return true;
-            } else {
-                com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
-                if (fragment != null) {
-                    fragment.onMultiSelectAction();
-                    return true;
-                }
+            } else if (currentDestinationId == R.id.navigation_albums) {
+                enterAlbumsSelectionMode();
+                return true;
             }
         } else if (id == R.id.action_cancel_selection) {
-            exitHomeSelectionMode();
+            exitSelectionMode();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -302,9 +324,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void enterHomeSelectionMode() {
-        if (selectionMode) return;
+        if (selectionModeTarget != SELECTION_NONE) return;
         if (currentDestinationId != R.id.navigation_home) return;
-        selectionMode = true;
+        selectionModeTarget = SELECTION_HOME;
         com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
         if (fragment != null) {
             fragment.setMultiSelectEnabled(true);
@@ -314,18 +336,79 @@ public class MainActivity extends AppCompatActivity {
         }
         if (selectAllView != null) selectAllView.setVisibility(View.VISIBLE);
         if (selectionTitleView != null) selectionTitleView.setVisibility(View.VISIBLE);
+        setSelectionBottomMenu(R.menu.category_photos_bottom_menu);
         showSelectionBottomBar(true);
         if (bottomNavigationView != null) bottomNavigationView.setVisibility(View.GONE);
         invalidateOptionsMenu();
     }
 
-    private void exitHomeSelectionMode() {
-        if (!selectionMode) return;
-        selectionMode = false;
+    public void enterHomeSelectionModeAndSelect(@NonNull com.example.photos.model.Photo photo) {
+        if (currentDestinationId != R.id.navigation_home) return;
+        if (selectionModeTarget == SELECTION_HOME) {
+            com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
+            if (fragment != null) {
+                fragment.selectPhoto(photo);
+            }
+            return;
+        }
+        if (selectionModeTarget != SELECTION_NONE) return;
+        enterHomeSelectionMode();
         com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
         if (fragment != null) {
-            fragment.setMultiSelectEnabled(false);
+            fragment.selectPhoto(photo);
         }
+    }
+
+    private void enterAlbumsSelectionMode() {
+        if (selectionModeTarget != SELECTION_NONE) return;
+        if (currentDestinationId != R.id.navigation_albums) return;
+        selectionModeTarget = SELECTION_ALBUMS;
+        com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+        if (fragment != null) {
+            fragment.setMultiSelectEnabled(true);
+        }
+        if (topAppBar != null) {
+            topAppBar.setTitle("");
+        }
+        if (selectAllView != null) selectAllView.setVisibility(View.VISIBLE);
+        if (selectionTitleView != null) selectionTitleView.setVisibility(View.VISIBLE);
+        setSelectionBottomMenu(R.menu.album_selection_bottom_menu);
+        showSelectionBottomBar(true);
+        if (bottomNavigationView != null) bottomNavigationView.setVisibility(View.GONE);
+        invalidateOptionsMenu();
+    }
+
+    public void enterAlbumsSelectionModeAndSelect(@NonNull SmartAlbum album) {
+        if (currentDestinationId != R.id.navigation_albums) return;
+        if (selectionModeTarget == SELECTION_ALBUMS) {
+            com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+            if (fragment != null) {
+                fragment.selectAlbum(album);
+            }
+            return;
+        }
+        if (selectionModeTarget != SELECTION_NONE) return;
+        enterAlbumsSelectionMode();
+        com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+        if (fragment != null) {
+            fragment.selectAlbum(album);
+        }
+    }
+
+    private void exitSelectionMode() {
+        if (selectionModeTarget == SELECTION_NONE) return;
+        if (selectionModeTarget == SELECTION_HOME) {
+            com.example.photos.ui.home.HomeFragment fragment = currentHomeFragment();
+            if (fragment != null) {
+                fragment.setMultiSelectEnabled(false);
+            }
+        } else if (selectionModeTarget == SELECTION_ALBUMS) {
+            com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+            if (fragment != null) {
+                fragment.setMultiSelectEnabled(false);
+            }
+        }
+        selectionModeTarget = SELECTION_NONE;
         if (selectAllView != null) selectAllView.setVisibility(View.GONE);
         if (selectionTitleView != null) selectionTitleView.setVisibility(View.GONE);
         showSelectionBottomBar(false);
@@ -335,6 +418,14 @@ public class MainActivity extends AppCompatActivity {
             topAppBar.setTitle(label == null ? "" : label);
         }
         invalidateOptionsMenu();
+    }
+
+    private void setSelectionBottomMenu(int menuRes) {
+        if (selectionBottomNavigation == null) return;
+        android.view.Menu menu = selectionBottomNavigation.getMenu();
+        menu.clear();
+        getMenuInflater().inflate(menuRes, menu);
+        clearSelectionBottomNavState();
     }
 
     private void showSelectionBottomBar(boolean show) {
@@ -419,7 +510,7 @@ public class MainActivity extends AppCompatActivity {
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
             startActivity(Intent.createChooser(intent, getString(R.string.share)));
-            exitHomeSelectionMode();
+            exitSelectionMode();
         } catch (Throwable t) {
             android.widget.Toast.makeText(this, R.string.share_failed, android.widget.Toast.LENGTH_SHORT).show();
         }
@@ -476,7 +567,7 @@ public class MainActivity extends AppCompatActivity {
                 if (fragment != null) {
                     fragment.reload();
                 }
-                exitHomeSelectionMode();
+                exitSelectionMode();
             });
         });
     }
@@ -490,6 +581,173 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showAlbumPickerForSelected(selected);
+    }
+
+    private void requestDeleteSelectedAlbums() {
+        com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+        if (fragment == null) return;
+        List<SmartAlbum> selected = fragment.getSelectedAlbums();
+        if (selected.isEmpty()) {
+            android.widget.Toast.makeText(this, R.string.no_selection, android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showDeleteAlbumsDialog(selected);
+    }
+
+    private void requestClearSelectedAlbumRecords() {
+        com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+        if (fragment == null) return;
+        List<SmartAlbum> selected = fragment.getSelectedAlbums();
+        if (selected.isEmpty()) {
+            android.widget.Toast.makeText(this, R.string.no_selection, android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showClearAlbumsDialog(selected);
+    }
+
+    private void showDeleteAlbumsDialog(@NonNull List<SmartAlbum> selected) {
+        android.view.View dialogView = android.view.LayoutInflater.from(this)
+                .inflate(R.layout.dialog_delete_confirm, null, false);
+        TextView message = dialogView.findViewById(R.id.deleteConfirmMessage);
+        androidx.appcompat.widget.AppCompatButton positive = dialogView.findViewById(R.id.deleteConfirmPositive);
+        androidx.appcompat.widget.AppCompatButton negative = dialogView.findViewById(R.id.deleteConfirmNegative);
+        if (message != null) {
+            if (selected.size() == 1) {
+                String name = selected.get(0) == null ? "" : selected.get(0).getTitle();
+                String display = com.example.photos.ui.albums.CategoryDisplay.displayOf(name);
+                message.setText(getString(R.string.album_delete_confirm_message, display));
+            } else {
+                message.setText(getString(R.string.album_delete_confirm_message_multi, selected.size()));
+            }
+        }
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        if (negative != null) {
+            negative.setText(R.string.delete_confirm_negative);
+            negative.setOnClickListener(v -> dialog.dismiss());
+        }
+        if (positive != null) {
+            positive.setText(R.string.album_delete_confirm_positive);
+            positive.setOnClickListener(v -> {
+                dialog.dismiss();
+                deleteAlbumsAsync(selected, true);
+            });
+        }
+        dialog.show();
+    }
+
+    private void showClearAlbumsDialog(@NonNull List<SmartAlbum> selected) {
+        android.view.View dialogView = android.view.LayoutInflater.from(this)
+                .inflate(R.layout.dialog_delete_confirm, null, false);
+        TextView message = dialogView.findViewById(R.id.deleteConfirmMessage);
+        androidx.appcompat.widget.AppCompatButton positive = dialogView.findViewById(R.id.deleteConfirmPositive);
+        androidx.appcompat.widget.AppCompatButton negative = dialogView.findViewById(R.id.deleteConfirmNegative);
+        if (message != null) {
+            if (selected.size() == 1) {
+                String name = selected.get(0) == null ? "" : selected.get(0).getTitle();
+                String display = com.example.photos.ui.albums.CategoryDisplay.displayOf(name);
+                message.setText(getString(R.string.album_clear_records_confirm_message, display));
+            } else {
+                message.setText(getString(R.string.album_clear_records_confirm_message_multi, selected.size()));
+            }
+        }
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        if (negative != null) {
+            negative.setText(R.string.delete_confirm_negative);
+            negative.setOnClickListener(v -> dialog.dismiss());
+        }
+        if (positive != null) {
+            positive.setText(R.string.ok);
+            positive.setOnClickListener(v -> {
+                dialog.dismiss();
+                clearAlbumsRecordsAsync(selected);
+            });
+        }
+        dialog.show();
+    }
+
+    private void deleteAlbumsAsync(@NonNull List<SmartAlbum> selected, boolean removeCustom) {
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+            for (SmartAlbum album : selected) {
+                if (album == null || album.getTitle() == null) continue;
+                String trimmed = album.getTitle().trim();
+                if (!trimmed.isEmpty()) names.add(trimmed);
+            }
+            try {
+                com.example.photos.db.CategoryDao dao = com.example.photos.db.PhotosDb.get(getApplicationContext()).categoryDao();
+                for (String name : names) {
+                    dao.deleteByCategory(name);
+                    if (removeCustom) {
+                        com.example.photos.ui.albums.CustomAlbumsStore.remove(getApplicationContext(), name);
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            runOnUiThread(() -> {
+                com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+                if (fragment != null) {
+                    fragment.reload();
+                }
+                if (names.size() == 1) {
+                    String single = names.iterator().next();
+                    String display = com.example.photos.ui.albums.CategoryDisplay.displayOf(single);
+                    android.widget.Toast.makeText(this, "已删除相册：" + display, android.widget.Toast.LENGTH_SHORT).show();
+                } else {
+                    android.widget.Toast.makeText(this,
+                            getString(R.string.album_delete_done_multi, names.size()),
+                            android.widget.Toast.LENGTH_SHORT).show();
+                }
+                exitSelectionMode();
+            });
+        });
+    }
+
+    private void clearAlbumsRecordsAsync(@NonNull List<SmartAlbum> selected) {
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+            for (SmartAlbum album : selected) {
+                if (album == null || album.getTitle() == null) continue;
+                String trimmed = album.getTitle().trim();
+                if (!trimmed.isEmpty()) names.add(trimmed);
+            }
+            try {
+                com.example.photos.db.CategoryDao dao = com.example.photos.db.PhotosDb.get(getApplicationContext()).categoryDao();
+                for (String name : names) {
+                    dao.deleteByCategory(name);
+                }
+            } catch (Throwable ignored) {
+            }
+            runOnUiThread(() -> {
+                com.example.photos.ui.albums.AlbumsFragment fragment = currentAlbumsFragment();
+                if (fragment != null) {
+                    fragment.reload();
+                }
+                if (names.size() == 1) {
+                    String single = names.iterator().next();
+                    String display = com.example.photos.ui.albums.CategoryDisplay.displayOf(single);
+                    android.widget.Toast.makeText(this,
+                            getString(R.string.album_clear_records_done, display),
+                            android.widget.Toast.LENGTH_SHORT).show();
+                } else {
+                    android.widget.Toast.makeText(this,
+                            getString(R.string.album_clear_records_done_multi, names.size()),
+                            android.widget.Toast.LENGTH_SHORT).show();
+                }
+                exitSelectionMode();
+            });
+        });
     }
 
     private void showAlbumPickerForSelected(@NonNull List<com.example.photos.model.Photo> selected) {
@@ -603,7 +861,7 @@ public class MainActivity extends AppCompatActivity {
                     android.widget.Toast.makeText(this,
                             getString(R.string.album_add_success, albumName),
                             android.widget.Toast.LENGTH_SHORT).show();
-                    exitHomeSelectionMode();
+                    exitSelectionMode();
                 } else {
                     android.widget.Toast.makeText(this, R.string.album_add_failed, android.widget.Toast.LENGTH_SHORT).show();
                 }

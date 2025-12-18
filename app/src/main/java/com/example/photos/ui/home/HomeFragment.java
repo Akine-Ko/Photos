@@ -115,7 +115,7 @@ public class HomeFragment extends Fragment {
     private void setupRecyclerView(@NonNull View view) {
         timelineRecyclerView = view.findViewById(R.id.homeRecyclerView);
         fastScroller = view.findViewById(R.id.homeFastScroller);
-        timelineAdapter = new PhotoAdapter(this::handlePhotoClick, true);
+        timelineAdapter = new PhotoAdapter(this::handlePhotoClick, this::handlePhotoLongClick, true);
         GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 4);
         layoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override
@@ -161,6 +161,13 @@ public class HomeFragment extends Fragment {
 
     private void handlePhotoClick(Photo photo) {
         openInViewer(photo);
+    }
+
+    private void handlePhotoLongClick(@NonNull Photo photo) {
+        android.app.Activity activity = getActivity();
+        if (activity instanceof com.example.photos.MainActivity) {
+            ((com.example.photos.MainActivity) activity).enterHomeSelectionModeAndSelect(photo);
+        }
     }
 
     private void updateOverviewState(HomeUiState uiState) {
@@ -307,6 +314,11 @@ public class HomeFragment extends Fragment {
     public List<Photo> getSelectedPhotos() {
         if (timelineAdapter == null) return new ArrayList<>();
         return timelineAdapter.getSelectedPhotos();
+    }
+
+    public void selectPhoto(@NonNull Photo photo) {
+        if (timelineAdapter == null) return;
+        timelineAdapter.selectPhoto(photo);
     }
 
     public void reload() {

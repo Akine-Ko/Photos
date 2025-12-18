@@ -57,7 +57,7 @@ public class CategoryPhotosFragment extends Fragment {
         RecyclerView rv = view.findViewById(R.id.categoryRecyclerView);
         adapter = new PhotoAdapter(photo -> {
             openAlbumViewer(photo);
-        });
+        }, this::handlePhotoLongClick, false);
         GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 4);
         rv.setLayoutManager(layoutManager);
         int spacing = getResources().getDimensionPixelSize(R.dimen.home_grid_spacing);
@@ -171,6 +171,18 @@ public class CategoryPhotosFragment extends Fragment {
     public List<Photo> getSelectedPhotos() {
         if (adapter == null) return new ArrayList<>();
         return adapter.getSelectedPhotos();
+    }
+
+    public void selectPhoto(@NonNull Photo photo) {
+        if (adapter == null) return;
+        adapter.selectPhoto(photo);
+    }
+
+    private void handlePhotoLongClick(@NonNull Photo photo) {
+        android.app.Activity activity = getActivity();
+        if (activity instanceof CategoryPhotosActivity) {
+            ((CategoryPhotosActivity) activity).enterSelectionModeAndSelect(photo);
+        }
     }
 
     private void openAlbumViewer(@NonNull Photo photo) {

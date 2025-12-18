@@ -48,9 +48,14 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void onPhotoClick(Photo photo);
     }
 
+    public interface OnPhotoLongClickListener {
+        void onPhotoLongClick(@NonNull Photo photo);
+    }
+
     private final List<Photo> items = new ArrayList<>();
     private final List<TimelineEntry> timelineItems = new ArrayList<>();
     private final OnPhotoClickListener clickListener;
+    private final OnPhotoLongClickListener longClickListener;
     private final boolean timelineMode;
     private List<Photo> currentTimelinePhotos = Collections.emptyList();
     private HomeOverview overview;
@@ -71,11 +76,16 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             .dontTransform();
 
     public PhotoAdapter(OnPhotoClickListener clickListener) {
-        this(clickListener, false);
+        this(clickListener, null, false);
     }
 
     public PhotoAdapter(OnPhotoClickListener clickListener, boolean timelineMode) {
+        this(clickListener, null, timelineMode);
+    }
+
+    public PhotoAdapter(OnPhotoClickListener clickListener, @Nullable OnPhotoLongClickListener longClickListener, boolean timelineMode) {
         this.clickListener = clickListener;
+        this.longClickListener = longClickListener;
         this.timelineMode = timelineMode;
         setHasStableIds(true);
     }
@@ -130,6 +140,20 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return out;
     }
 
+    public void selectPhoto(@NonNull Photo photo) {
+        if (!selectionMode) return;
+        String key = keyOf(photo);
+        if (key.isEmpty()) return;
+        if (selectedKeys.add(key)) {
+            int pos = findPositionByKey(key);
+            if (pos != RecyclerView.NO_POSITION) {
+                notifyItemChanged(pos);
+            } else {
+                notifyDataSetChanged();
+            }
+        }
+    }
+
     public void toggleSelectAll() {
         if (!selectionMode) return;
         int total = getSelectableCount();
@@ -178,6 +202,23 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
         selectedKeys.add(key);
         return true;
+    }
+
+    private int findPositionByKey(@NonNull String key) {
+        if (timelineMode) {
+            for (int i = 0; i < timelineItems.size(); i++) {
+                TimelineEntry e = timelineItems.get(i);
+                if (e == null || e.type != TYPE_PHOTO || e.photo == null) continue;
+                if (key.equals(keyOf(e.photo))) return i;
+            }
+            return RecyclerView.NO_POSITION;
+        }
+        for (int i = 0; i < items.size(); i++) {
+            Photo p = items.get(i);
+            if (p == null) continue;
+            if (key.equals(keyOf(p))) return i;
+        }
+        return RecyclerView.NO_POSITION;
     }
 
     public boolean isFullWidthPosition(int position) {
@@ -423,6 +464,23 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 if (clickListener != null) {
                     clickListener.onPhotoClick(photo);
                 }
+            });
+            itemView.setOnLongClickListener(v -> {
+                if (selectionMode) {
+                    toggleSelected(photo);
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        notifyItemChanged(pos);
+                    } else {
+                        notifyDataSetChanged();
+                    }
+                    return true;
+                }
+                if (longClickListener != null) {
+                    longClickListener.onPhotoLongClick(photo);
+                    return true;
+                }
+                return false;
             });
         }
 

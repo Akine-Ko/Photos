@@ -82,6 +82,8 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                     requestDeleteSelected();
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbum();
+                } else if (id == R.id.action_remove_from_album) {
+                    removeSelectedFromAlbum();
                 }
                 clearBottomNavSelection();
                 return false; // treat as actions; don't keep selected state
@@ -94,6 +96,8 @@ public class CategoryPhotosActivity extends AppCompatActivity {
                     requestDeleteSelected();
                 } else if (id == R.id.action_add_to) {
                     addSelectedToAlbum();
+                } else if (id == R.id.action_remove_from_album) {
+                    removeSelectedFromAlbum();
                 }
                 clearBottomNavSelection();
             });
@@ -280,6 +284,16 @@ public class CategoryPhotosActivity extends AppCompatActivity {
         updateTitle();
     }
 
+    public void enterSelectionModeAndSelect(@NonNull com.example.photos.model.Photo photo) {
+        if (!selectionMode) {
+            enterSelectionMode();
+        }
+        CategoryPhotosFragment fragment = currentCategoryFragment();
+        if (fragment != null) {
+            fragment.selectPhoto(photo);
+        }
+    }
+
     private void exitSelectionMode() {
         if (!selectionMode) return;
         selectionMode = false;
@@ -447,6 +461,53 @@ public class CategoryPhotosActivity extends AppCompatActivity {
         }
         // Reuse viewer's album picker UI.
         showAlbumPickerForSelected(selected);
+    }
+
+    private void removeSelectedFromAlbum() {
+        CategoryPhotosFragment fragment = currentCategoryFragment();
+        if (fragment == null) return;
+        List<com.example.photos.model.Photo> selected = fragment.getSelectedPhotos();
+        if (selected.isEmpty()) {
+            android.widget.Toast.makeText(this, R.string.no_selection, android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String category = categoryKey == null ? "" : categoryKey.trim();
+        if (category.isEmpty()) {
+            android.widget.Toast.makeText(this, R.string.no_selection, android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayList<String> keys = new ArrayList<>();
+        for (com.example.photos.model.Photo p : selected) {
+            if (p == null || p.getImageUrl() == null) continue;
+            keys.add(p.getImageUrl());
+        }
+        if (keys.isEmpty()) {
+            android.widget.Toast.makeText(this, R.string.no_selection, android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                com.example.photos.db.CategoryDao dao = PhotosDb.get(getApplicationContext()).categoryDao();
+                for (String k : keys) {
+                    if (k == null || k.isEmpty()) continue;
+                    try {
+                        dao.deleteByMediaKeyAndCategory(k, category);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            runOnUiThread(() -> {
+                CategoryPhotosFragment f = currentCategoryFragment();
+                if (f != null) {
+                    f.reload();
+                }
+                android.widget.Toast.makeText(this,
+                        getString(R.string.album_remove_from_current_done, keys.size()),
+                        android.widget.Toast.LENGTH_SHORT).show();
+                exitSelectionMode();
+            });
+        });
     }
 
     private void showAlbumPickerForSelected(@NonNull List<com.example.photos.model.Photo> selected) {

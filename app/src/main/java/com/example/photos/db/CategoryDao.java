@@ -46,6 +46,9 @@ public interface CategoryDao {
     @Query("DELETE FROM categories_sparse WHERE mediaKey = :mediaKey")
     void deleteByMediaKey(String mediaKey);
 
+    @Query("DELETE FROM categories_sparse WHERE mediaKey = :mediaKey AND category = :category")
+    void deleteByMediaKeyAndCategory(String mediaKey, String category);
+
     @Query("UPDATE categories_sparse SET category = :to WHERE category = :from")
     void renameCategory(String from, String to);
 
