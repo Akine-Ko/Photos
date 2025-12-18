@@ -85,7 +85,7 @@
     <string name="profile_run_classifier_button">运行全量分类</string>
     <string name="profile_run_sample_button">运行 200 张分类</string>
     <string name="profile_clear_categories_button">清空分类结果</string>
-    <string name="profile_clear_features_button">清空 CLIP 向量缓存</string>
+    <string name="profile_clear_features_button">清除已存向量</string>
     <string name="profile_embedding_job_scheduled">已触发 MobileCLIP 向量预计算</string>
     <string name="profile_embedding_sample_enqueued">已触发 200 张向量预计算</string>
     <string name="profile_classifier_job_scheduled">已触发自动分类任务</string>

@@ -273,6 +273,7 @@ public class ProfileFragment extends Fragment {
                 PhotosDb db = PhotosDb.get(app);
                 db.featureDao().deleteByType(com.example.photos.features.FeatureType.CLIP_IMAGE_EMB.getCode());
                 db.featureDao().deleteByType(com.example.photos.features.FeatureType.DINO_IMAGE_EMB.getCode());
+                db.featureDao().deleteByType(com.example.photos.features.FeatureType.FACE_SFACE_EMB.getCode());
                 new HnswImageIndex(app, "dino_hnsw.index").clear();
                 new HnswImageIndex(app, "clip_hnsw.index").clear();
                 new HnswImageIndex(app, "face_hnsw.index").clear();
