@@ -17,6 +17,7 @@ import androidx.work.WorkManager;
 import com.example.photos.R;
 import com.example.photos.classify.ClipClassifier;
 import com.example.photos.db.PhotosDb;
+import com.example.photos.search.HnswImageIndex;
 import com.example.photos.settings.SearchPreferences;
 import com.example.photos.sync.ClassificationWorker;
 import com.example.photos.sync.ClipEmbeddingWorker;
@@ -268,9 +269,13 @@ public class ProfileFragment extends Fragment {
         executor.execute(() -> {
             boolean success = true;
             try {
-                PhotosDb db = PhotosDb.get(requireContext().getApplicationContext());
+                Context app = requireContext().getApplicationContext();
+                PhotosDb db = PhotosDb.get(app);
                 db.featureDao().deleteByType(com.example.photos.features.FeatureType.CLIP_IMAGE_EMB.getCode());
                 db.featureDao().deleteByType(com.example.photos.features.FeatureType.DINO_IMAGE_EMB.getCode());
+                new HnswImageIndex(app, "dino_hnsw.index").clear();
+                new HnswImageIndex(app, "clip_hnsw.index").clear();
+                new HnswImageIndex(app, "face_hnsw.index").clear();
             } catch (Throwable t) {
                 success = false;
             }

@@ -28,10 +28,12 @@ public final class HnswImageIndex {
     private final Object lock = new Object();
     private HnswIndex<String, float[], VectorItem, Float> index;
     private final File indexFile;
+    private final File legacyCacheFile;
 
     public HnswImageIndex(Context ctx, String indexFileName) {
         this.indexFileName = indexFileName;
-        this.indexFile = new File(ctx.getCacheDir(), indexFileName);
+        this.indexFile = new File(ctx.getFilesDir(), indexFileName);
+        this.legacyCacheFile = new File(ctx.getCacheDir(), indexFileName);
     }
 
     public boolean isReady() {
@@ -44,10 +46,8 @@ public final class HnswImageIndex {
         synchronized (lock) {
             index = null;
         }
-        if (indexFile.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            indexFile.delete();
-        }
+        deleteIfExists(indexFile);
+        deleteIfExists(legacyCacheFile);
     }
 
     public void save() {
@@ -62,20 +62,18 @@ public final class HnswImageIndex {
     }
 
     public boolean loadIfExists() {
-        if (!indexFile.exists()) return false;
-        try (FileInputStream fis = new FileInputStream(indexFile)) {
-            HnswIndex<String, float[], VectorItem, Float> loaded =
-                    HnswIndex.load(fis);
-            loaded.setEf(EF_SEARCH);
-            synchronized (lock) {
-                index = loaded;
-            }
-            Log.i(TAG, "loaded hnsw from cache, size=" + loaded.size());
-            return true;
-        } catch (Exception e) {
-            Log.w(TAG, "load hnsw failed", e);
-            return false;
+        if (indexFile.exists()) {
+            return loadFrom(indexFile);
         }
+        if (legacyCacheFile.exists()) {
+            boolean loaded = loadFrom(legacyCacheFile);
+            if (loaded) {
+                save();
+                deleteIfExists(legacyCacheFile);
+            }
+            return loaded;
+        }
+        return false;
     }
 
     public void build(List<VectorItem> items, int dim) {
@@ -107,6 +105,28 @@ public final class HnswImageIndex {
             Log.w(TAG, "hnsw search failed", e);
             return Collections.emptyList();
         }
+    }
+
+    private boolean loadFrom(File file) {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            HnswIndex<String, float[], VectorItem, Float> loaded =
+                    HnswIndex.load(fis);
+            loaded.setEf(EF_SEARCH);
+            synchronized (lock) {
+                index = loaded;
+            }
+            Log.i(TAG, "loaded hnsw, size=" + loaded.size());
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "load hnsw failed", e);
+            return false;
+        }
+    }
+
+    private static void deleteIfExists(File file) {
+        if (file == null || !file.exists()) return;
+        //noinspection ResultOfMethodCallIgnored
+        file.delete();
     }
 
     public static final class VectorItem implements Item<String, float[]>, java.io.Serializable {
