@@ -22,10 +22,7 @@
     <string name="home_search_hint">描述图片内容以搜索相关图片</string>
     <string name="albums_add_album">添加相册</string>
     <string name="albums_multi_select">多选相册</string>
-    <string name="title_home">首页</string>
     <string name="title_albums">相册</string>
-    <string name="title_search">搜索</string>
-    <string name="title_profile">我的</string>
     <string name="add_to">添加到</string>
     <string name="albums_add_album_hint">输入相册名称</string>
     <string name="albums_add_album_empty">名称不能为空</string>
@@ -46,8 +43,6 @@
     <string name="album_delete_done_multi">已删除选中的%1$d个相册</string>
     <string name="remove_from_album">移除</string>
     <string name="album_remove_from_current_done">已从相册移除%1$d张</string>
-    <string name="multi_select_on">已进入多选</string>
-    <string name="multi_select_off">已退出多选</string>
     <string name="select_all">全选</string>
     <string name="select_items">选择项目</string>
     <string name="no_selection">未选择任何项目</string>
@@ -60,24 +55,9 @@
     <string name="home_image_search_result_message">找到 %1$d 张与参考图相似的照片</string>
 
     <string name="home_photo_content_description">照片缩略图</string>
-    <string name="home_favorite_badge_content_description">精选照片标识</string>
-    <string name="photo_meta_template">%1$s · %2$s</string>
-
     <string name="albums_header_title">智能分类</string>
     <string name="albums_empty_state">AI 分类还在进行中，稍后尝试刷新</string>
     <string name="album_count_template">%1$d 张</string>
-
-    <string name="profile_title">端侧能力控制台</string>
-    <string name="profile_subtitle">管理同步策略、备份频率与隐私设置</string>
-    <string name="profile_button_backup">立即触发增量备份</string>
-    <string name="profile_button_settings">打开隐私与权限设置</string>
-    <string name="profile_backup_on">已开启 Wi‑Fi 自动备份，夜间优先执行</string>
-    <string name="profile_backup_off">已关闭自动备份，保留手动触发能力</string>
-    <string name="profile_mobile_on">移动网络备份开启，将自动识别 1080P 以下低码率资源</string>
-    <string name="profile_mobile_off">移动网络备份关闭，避免额外流量消耗</string>
-    <string name="profile_backup_enqueued">增量备份任务已加入调度队列</string>
-    <string name="profile_settings_hint">跳转设置页前请集成系统权限组</string>
-
     <string name="profile_classifier_header">智能分类</string>
     <string name="profile_classifier_summary">第一步会用 MobileCLIP 把照片嵌入特征缓存，第二步再根据固定类别做自动分类。</string>
     <string name="profile_run_embedding_button">预计算全量向量</string>
@@ -110,18 +90,13 @@
     <string name="back">返回</string>
     <string name="edit">编辑</string>
     <string name="more">更多</string>
-    <string name="viewer_index_label">第 %1$d 张</string>
-    <string name="viewer_title_default">图库浏览</string>
     <string name="profile_search_limit_title">搜索返回条数</string>
     <string name="profile_search_limit_summary">用于文本搜索/以图搜图的最大返回项，默认 4 张。</string>
     <string name="profile_search_limit_applied">已设置搜索返回条数为 %1$d</string>
-    <string name="label_size">大小 %1$s</string>
-    <string name="label_resolution">分辨率 %1$d × %2$d</string>
     <string name="info_label_name">名称</string>
     <string name="info_label_time">时间</string>
     <string name="info_label_size">大小</string>
     <string name="info_label_params">参数</string>
-    <string name="info_label_exposure">曝光参数</string>
     <string name="info_label_path">路径</string>
     <string name="info_label_location">地点</string>
     <string name="notification_channel_processing">向量和分类</string>
