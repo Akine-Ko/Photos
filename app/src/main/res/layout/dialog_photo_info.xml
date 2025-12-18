@@ -27,10 +27,8 @@
                 android:layout_height="wrap_content"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingLeft="32dp"
-                android:paddingRight="24dp"
-                android:paddingTop="36dp"
-                android:paddingBottom="24dp"
+                app:contentPaddingTop="15dp"
+                app:contentPaddingBottom="15dp"
                 app:cardBackgroundColor="#EEFFFFFF"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="12dp"
@@ -42,15 +40,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="2dp">
+                    android:paddingLeft="32dp"
+                    android:paddingRight="24dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginTop="18dp"
-                        android:layout_marginBottom="12dp">
+                        android:gravity="center_vertical">
 
                         <TextView
                             android:id="@+id/infoLabelName"
@@ -81,7 +78,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="8dp">
+                        android:layout_marginTop="12dp">
 
                         <TextView
                             android:id="@+id/infoLabelDate"
@@ -110,7 +107,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="12dp">
+                        android:layout_marginTop="12dp">
 
                         <TextView
                             android:id="@+id/infoLabelSize"
@@ -141,7 +138,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="12dp">
+                        android:layout_marginTop="12dp">
 
                         <TextView
                             android:id="@+id/infoLabelCamera"
