@@ -39,7 +39,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     private static final int TYPE_HEADER = 0;
     private static final int TYPE_PHOTO = 1;
-    private static final int TYPE_OVERVIEW = 2;
 
     /**
      * 对外暴露点击事件，方便 Fragment 触发导航或弹窗。
@@ -58,7 +57,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private final OnPhotoLongClickListener longClickListener;
     private final boolean timelineMode;
     private List<Photo> currentTimelinePhotos = Collections.emptyList();
-    private HomeOverview overview;
     private boolean selectionMode = false;
     private final Set<String> selectedKeys = new HashSet<>();
     private final Executor diffExecutor = Executors.newSingleThreadExecutor();
@@ -226,7 +224,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             return false;
         }
         int type = timelineItems.get(position).type;
-        return type == TYPE_HEADER || type == TYPE_OVERVIEW;
+        return type == TYPE_HEADER;
     }
 
     public int getItemCountSafe() {
@@ -246,13 +244,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 return extractDayLabel(entry.photo == null ? null : entry.photo.getCaptureDate());
             default:
                 return findNearestLabel(position);
-        }
-    }
-
-    public void setOverview(HomeOverview overview) {
-        this.overview = overview;
-        if (timelineMode) {
-            rebuildTimelineAsync();
         }
     }
 
@@ -296,9 +287,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     private List<TimelineEntry> buildTimelineEntries(List<Photo> photos) {
         List<TimelineEntry> entries = new ArrayList<>();
-        if (overview != null) {
-            entries.add(TimelineEntry.overview(overview));
-        }
         if (photos == null || photos.isEmpty()) {
             return entries;
         }
@@ -396,10 +384,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_timeline_header, parent, false);
             return new HeaderViewHolder(view);
-        } else if (viewType == TYPE_OVERVIEW) {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_home_overview, parent, false);
-            return new OverviewViewHolder(view);
         }
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_photo, parent, false);
         return new PhotoViewHolder(view);
@@ -409,8 +393,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         if (holder instanceof HeaderViewHolder) {
             ((HeaderViewHolder) holder).bind(timelineItems.get(position).label);
-        } else if (holder instanceof OverviewViewHolder) {
-            ((OverviewViewHolder) holder).bind(timelineItems.get(position).overview);
         } else if (holder instanceof PhotoViewHolder) {
             Photo photo = timelineMode ? timelineItems.get(position).photo : items.get(position);
             if (photo != null) {
@@ -447,7 +429,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 selectionBox.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
                 selectionBox.setSelected(selected);
             }
-            applyPrivacyAndLoadImage(photo);
+            loadImage(photo);
             preloadNext(position());
 
             itemView.setOnClickListener(v -> {
@@ -488,16 +470,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             return getBindingAdapterPosition();
         }
 
-        private void applyPrivacyAndLoadImage(Photo photo) {
-            String key = com.example.photos.privacy.PrivacyManager.mediaKeyFrom(null, photo.getImageUrl());
-            com.example.photos.privacy.PrivacyPolicy policy = new com.example.photos.privacy.PrivacyManager(itemView.getContext()).getPolicy(key);
-            boolean sensitive = policy == com.example.photos.privacy.PrivacyPolicy.SENSITIVE;
-            boolean secret = policy == com.example.photos.privacy.PrivacyPolicy.SECRET;
-
-            if (secret) {
-                photoImageView.setImageResource(R.drawable.ic_photo_placeholder);
-                return;
-            }
+        private void loadImage(Photo photo) {
             Glide.with(photoImageView.getContext())
                     .load(photo.getImageUrl())
                     .apply(GLIDE_OPTIONS)
@@ -516,9 +489,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         private void preloadAt(int targetPosition) {
             Photo next = findNextPhoto(targetPosition);
             if (next == null) return;
-            String key = com.example.photos.privacy.PrivacyManager.mediaKeyFrom(null, next.getImageUrl());
-            com.example.photos.privacy.PrivacyPolicy policy = new com.example.photos.privacy.PrivacyManager(itemView.getContext()).getPolicy(key);
-            if (policy == com.example.photos.privacy.PrivacyPolicy.SECRET) return;
             Glide.with(itemView.getContext())
                     .load(next.getImageUrl())
                     .apply(GLIDE_OPTIONS)
@@ -540,50 +510,22 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
-    private static class OverviewViewHolder extends RecyclerView.ViewHolder {
-        private final TextView greetingTextView;
-        private final TextView insightTextView;
-        private final TextView totalValueTextView;
-        private final TextView favoriteValueTextView;
-        private final TextView filteredValueTextView;
-
-        OverviewViewHolder(@NonNull View itemView) {
-            super(itemView);
-            greetingTextView = itemView.findViewById(R.id.overviewGreetingTextView);
-            insightTextView = itemView.findViewById(R.id.overviewSummaryInsightTextView);
-            totalValueTextView = itemView.findViewById(R.id.overviewSummaryTotalValueTextView);
-            favoriteValueTextView = itemView.findViewById(R.id.overviewSummaryFavoriteValueTextView);
-            filteredValueTextView = itemView.findViewById(R.id.overviewSummaryFilteredValueTextView);
-        }
-
-        void bind(HomeOverview overview) {
-            if (overview == null) return;
-            greetingTextView.setText(overview.greeting);
-            insightTextView.setText(overview.insight);
-            totalValueTextView.setText(String.valueOf(overview.totalPhotos));
-            favoriteValueTextView.setText(String.valueOf(overview.favoriteCount));
-            filteredValueTextView.setText(String.valueOf(overview.filteredCount));
-        }
-    }
-
     private static class TimelineEntry {
         final int type;
         final String label;
         final Photo photo;
-        final HomeOverview overview;
         final long stableId;
 
-        private TimelineEntry(int type, String label, Photo photo, HomeOverview overview, long stableId) {
+        private TimelineEntry(int type, String label, Photo photo, long stableId) {
             this.type = type;
             this.label = label;
             this.photo = photo;
-            this.overview = overview;
             this.stableId = stableId;
         }
 
         static TimelineEntry header(String label) {
             long id = ("header_" + label).hashCode();
-            return new TimelineEntry(TYPE_HEADER, label, null, null, id);
+            return new TimelineEntry(TYPE_HEADER, label, null, id);
         }
 
         static TimelineEntry photo(Photo photo) {
@@ -595,28 +537,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     id = photo.getId().hashCode();
                 }
             }
-            return new TimelineEntry(TYPE_PHOTO, null, photo, null, id);
-        }
-
-        static TimelineEntry overview(HomeOverview overview) {
-            long id = 0x4F56455256494557L; // "OVERVIEW" marker
-            return new TimelineEntry(TYPE_OVERVIEW, null, null, overview, id);
-        }
-    }
-
-    public static class HomeOverview {
-        final String greeting;
-        final String insight;
-        final int totalPhotos;
-        final int favoriteCount;
-        final int filteredCount;
-
-        public HomeOverview(String greeting, String insight, int totalPhotos, int favoriteCount, int filteredCount) {
-            this.greeting = greeting;
-            this.insight = insight;
-            this.totalPhotos = totalPhotos;
-            this.favoriteCount = favoriteCount;
-            this.filteredCount = filteredCount;
+            return new TimelineEntry(TYPE_PHOTO, null, photo, id);
         }
     }
 
@@ -701,13 +622,6 @@ public class PhotoAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     String oldId = old.photo == null ? null : old.photo.getId();
                     String newId = newer.photo == null ? null : newer.photo.getId();
                     return Objects.equals(oldId, newId);
-                case TYPE_OVERVIEW:
-                    return Objects.equals(old.overview == null ? null : old.overview.insight,
-                            newer.overview == null ? null : newer.overview.insight)
-                            && Objects.equals(old.overview == null ? null : old.overview.greeting,
-                            newer.overview == null ? null : newer.overview.greeting)
-                            && (old.overview == null ? -1 : old.overview.totalPhotos)
-                            == (newer.overview == null ? -1 : newer.overview.totalPhotos);
                 default:
                     return false;
             }

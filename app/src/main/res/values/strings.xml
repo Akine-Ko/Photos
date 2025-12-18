@@ -6,19 +6,6 @@
     <string name="nav_albums">相册</string>
     <string name="nav_profile">我的</string>
 
-    <string name="home_greeting_placeholder">智能照片助手</string>
-    <string name="home_greeting_template">%1$s好，欢迎回来</string>
-    <string name="home_greeting_dawn">凌晨</string>
-    <string name="home_greeting_morning">上午</string>
-    <string name="home_greeting_afternoon">下午</string>
-    <string name="home_greeting_evening">晚上</string>
-
-    <string name="home_summary_title">数字影像驾驶舱</string>
-    <string name="home_summary_placeholder">智能引擎正在获取照片洞察</string>
-    <string name="home_summary_total_label">全部资产</string>
-    <string name="home_summary_favorite_label">精选收藏</string>
-    <string name="home_summary_filtered_label">当前筛选</string>
-
     <string name="home_search_hint">描述图片内容以搜索相关图片</string>
     <string name="albums_add_album">添加相册</string>
     <string name="albums_multi_select">多选相册</string>

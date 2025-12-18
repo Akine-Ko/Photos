@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,14 +20,11 @@ import androidx.work.WorkManager;
 import com.example.photos.R;
 import com.example.photos.db.PhotosDb;
 import com.example.photos.model.Photo;
-import com.example.photos.model.PhotoCategory;
 import com.example.photos.sync.MediaIncrementalSyncWorker;
 import com.example.photos.ui.common.GridSpacingItemDecoration;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -45,7 +41,6 @@ public class HomeFragment extends Fragment {
     private boolean pendingMediaRefresh = false;
     private int lastPhotoCount = 0;
     private boolean pendingScrollToTop = true;
-    private String greetingText;
     private final TimelineFastScroller.DateLabelProvider fastScrollLabelProvider =
             new TimelineFastScroller.DateLabelProvider() {
                 @Override
@@ -78,7 +73,6 @@ public class HomeFragment extends Fragment {
             viewModel.loadFromMediaStore(app);
         }
 
-        greetingText = buildGreetingText();
         setupRecyclerView(view);
         observeViewModel();
         viewerLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -153,10 +147,6 @@ public class HomeFragment extends Fragment {
                 scrollTimelineToTop();
             }
         });
-        viewModel.getUiStateLiveData().observe(getViewLifecycleOwner(), uiState -> {
-            if (uiState == null) return;
-            updateOverviewState(uiState);
-        });
     }
 
     private void handlePhotoClick(Photo photo) {
@@ -168,21 +158,6 @@ public class HomeFragment extends Fragment {
         if (activity instanceof com.example.photos.MainActivity) {
             ((com.example.photos.MainActivity) activity).enterHomeSelectionModeAndSelect(photo);
         }
-    }
-
-    private void updateOverviewState(HomeUiState uiState) {
-        // 数字驾驶舱已移除，不再更新概览卡片。
-    }
-
-    private String buildGreetingText() {
-        Calendar calendar = Calendar.getInstance(Locale.getDefault());
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        String period;
-        if (hour < 6) period = getString(R.string.home_greeting_dawn);
-        else if (hour < 12) period = getString(R.string.home_greeting_morning);
-        else if (hour < 18) period = getString(R.string.home_greeting_afternoon);
-        else period = getString(R.string.home_greeting_evening);
-        return getString(R.string.home_greeting_template, period);
     }
 
     private void observeIncrementalWorker() {
