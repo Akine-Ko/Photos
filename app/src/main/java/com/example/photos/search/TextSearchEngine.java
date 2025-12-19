@@ -59,6 +59,50 @@ public final class TextSearchEngine {
             return Collections.emptyList();
         }
         android.util.Log.i(TAG, "search query=\"" + query + "\" translated=\"" + translated + "\" textDim=" + textEmbedding.length + " vectors=" + records.size());
+        List<SearchResultInternal> ordered = searchWithHnsw(context, textEmbedding, limit);
+        if (ordered == null) {
+            ordered = linearSearch(records, textEmbedding, limit);
+        }
+        // Log top scores for debugging/search visibility in logcat.
+        if (!ordered.isEmpty()) {
+            int logCount = Math.min(5, ordered.size());
+            StringBuilder sb = new StringBuilder("top scores: ");
+            for (int i = 0; i < logCount; i++) {
+                SearchResultInternal r = ordered.get(i);
+                if (i > 0) sb.append(" | ");
+                sb.append(i).append(":").append(r.mediaKey).append("=").append(r.score);
+            }
+            android.util.Log.i(TAG, sb.toString());
+        }
+        List<SearchResult> out = new ArrayList<>();
+        PhotoDao photoDao = db.photoDao();
+        for (SearchResultInternal internal : ordered) {
+            Photo photo = mapToPhoto(photoDao, internal.mediaKey);
+            if (photo != null) {
+                out.add(new SearchResult(photo, internal.score));
+            }
+        }
+        return out;
+    }
+
+    private static List<SearchResultInternal> searchWithHnsw(Context context, float[] query, int limit) {
+        HnswImageIndex hnsw = new HnswImageIndex(context.getApplicationContext(), "clip_hnsw.index");
+        if (!hnsw.loadIfExists()) {
+            return null;
+        }
+        var res = hnsw.search(query, limit);
+        List<SearchResultInternal> ordered = new ArrayList<>();
+        for (var r : res) {
+            // cosine distance -> similarity
+            float score = (float) (1.0 - r.distance());
+            ordered.add(new SearchResultInternal(r.item().id(), score));
+        }
+        ordered.sort((a, b) -> Float.compare(b.score, a.score));
+        android.util.Log.i(TAG, "HNSW search used, got=" + ordered.size());
+        return ordered;
+    }
+
+    private static List<SearchResultInternal> linearSearch(List<FeatureRecord> records, float[] textEmbedding, int limit) {
         PriorityQueue<SearchResultInternal> heap = new PriorityQueue<>(limit, Comparator.comparingDouble(r -> r.score));
         int used = 0;
         int skippedDim = 0;
@@ -81,26 +125,8 @@ public final class TextSearchEngine {
         android.util.Log.i(TAG, "processed=" + used + " skippedDim=" + skippedDim + " heap=" + heap.size());
         List<SearchResultInternal> ordered = new ArrayList<>(heap);
         ordered.sort((a, b) -> Float.compare(b.score, a.score));
-        // Log top scores for debugging/search visibility in logcat.
-        if (!ordered.isEmpty()) {
-            int logCount = Math.min(5, ordered.size());
-            StringBuilder sb = new StringBuilder("top scores: ");
-            for (int i = 0; i < logCount; i++) {
-                SearchResultInternal r = ordered.get(i);
-                if (i > 0) sb.append(" | ");
-                sb.append(i).append(":").append(r.mediaKey).append("=").append(r.score);
-            }
-            android.util.Log.i(TAG, sb.toString());
-        }
-        List<SearchResult> out = new ArrayList<>();
-        PhotoDao photoDao = db.photoDao();
-        for (SearchResultInternal internal : ordered) {
-            Photo photo = mapToPhoto(photoDao, internal.mediaKey);
-            if (photo != null) {
-                out.add(new SearchResult(photo, internal.score));
-            }
-        }
-        return out;
+        android.util.Log.i(TAG, "HNSW missing -> linear search, results=" + ordered.size());
+        return ordered;
     }
 
     private static Photo mapToPhoto(PhotoDao photoDao, String mediaKey) {
