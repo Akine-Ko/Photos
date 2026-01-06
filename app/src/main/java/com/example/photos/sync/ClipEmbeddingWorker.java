@@ -2,6 +2,7 @@ package com.example.photos.sync;
 
 import android.content.Context;
 import android.util.Log;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.work.Data;
@@ -23,8 +24,10 @@ import com.example.photos.features.FeatureType;
 import com.example.photos.search.DinoImageEmbedder;
 import com.example.photos.search.HnswImageIndex;
 import com.example.photos.search.face.SFaceOpenCv;
+import com.example.photos.util.PerfLogger;
 
 import java.util.List;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -62,6 +65,7 @@ public class ClipEmbeddingWorker extends Worker {
         boolean full = MODE_FULL.equals(mode);
         int limit = getInputData().getInt(KEY_LIMIT, 120);
         boolean force = getInputData().getBoolean(KEY_FORCE, false);
+        String perfSession = "embed-" + (mode == null ? "unknown" : mode) + "-" + System.currentTimeMillis();
         Context app = getApplicationContext();
         Log.i(TAG, "Start embedding mode=" + mode + " full=" + full + " limit=" + limit + " force=" + force);
         if (!startForeground()) {
@@ -75,9 +79,9 @@ public class ClipEmbeddingWorker extends Worker {
         FeatureDao featureDao = db.featureDao();
         try {
             if (full) {
-                runFull(photoDao, featureDao, force);
+                runFull(photoDao, featureDao, force, perfSession);
             } else {
-                runRecent(photoDao, featureDao, limit, force);
+                runRecent(photoDao, featureDao, limit, force, perfSession);
             }
             return Result.success();
         } catch (Throwable t) {
@@ -86,26 +90,26 @@ public class ClipEmbeddingWorker extends Worker {
         }
     }
 
-    private void runRecent(PhotoDao photoDao, FeatureDao featureDao, int limit, boolean force) {
+    private void runRecent(PhotoDao photoDao, FeatureDao featureDao, int limit, boolean force, String perfSession) {
         if (limit <= 0) limit = 120;
         List<PhotoAsset> latest = photoDao.queryLatest(limit);
         Log.i(TAG, "runRecent fetched=" + (latest == null ? 0 : latest.size()));
         if (isStopped()) return;
         resetProgress(latest == null ? 0 : latest.size());
         resetCounters();
-        encodeBatch(latest, featureDao, force);
+        encodeBatch(latest, featureDao, force, perfSession);
         if (isStopped()) return;
-        rebuildHnsw(featureDao);
+        rebuildHnsw(featureDao, perfSession);
         if (isStopped()) return;
-        rebuildFaceHnsw(featureDao);
+        rebuildFaceHnsw(featureDao, perfSession);
         if (isStopped()) return;
-        rebuildClipHnsw(featureDao);
+        rebuildClipHnsw(featureDao, perfSession);
         Log.i(TAG, "Embedding recent done processed=" + progressProcessed + "/" + progressTotal
                 + " clip=" + clipCount + " dino=" + dinoCount + " face=" + faceCount
                 + " stopped=" + isStopped());
     }
 
-    private void runFull(PhotoDao photoDao, FeatureDao featureDao, boolean force) {
+    private void runFull(PhotoDao photoDao, FeatureDao featureDao, boolean force, String perfSession) {
         final int PAGE = 200;
         int offset = 0;
         int total = photoDao.countAll();
@@ -115,21 +119,21 @@ public class ClipEmbeddingWorker extends Worker {
         while (!isStopped()) {
             List<PhotoAsset> page = photoDao.queryPaged(PAGE, offset);
             if (page == null || page.isEmpty()) break;
-            encodeBatch(page, featureDao, force);
+            encodeBatch(page, featureDao, force, perfSession);
             offset += PAGE;
         }
         if (isStopped()) return;
-        rebuildHnsw(featureDao);
+        rebuildHnsw(featureDao, perfSession);
         if (isStopped()) return;
-        rebuildFaceHnsw(featureDao);
+        rebuildFaceHnsw(featureDao, perfSession);
         if (isStopped()) return;
-        rebuildClipHnsw(featureDao);
+        rebuildClipHnsw(featureDao, perfSession);
         Log.i(TAG, "Embedding full done processed=" + progressProcessed + "/" + progressTotal
                 + " clip=" + clipCount + " dino=" + dinoCount + " face=" + faceCount
                 + " stopped=" + isStopped());
     }
 
-    private void encodeBatch(List<PhotoAsset> assets, FeatureDao featureDao, boolean force) {
+    private void encodeBatch(List<PhotoAsset> assets, FeatureDao featureDao, boolean force, String perfSession) {
         if (assets == null || assets.isEmpty()) return;
         for (PhotoAsset asset : assets) {
             if (isStopped()) return;
@@ -157,11 +161,13 @@ public class ClipEmbeddingWorker extends Worker {
             if (needClip) {
                 if (isStopped()) return;
                 float[] embedding = null;
+                long t0 = SystemClock.elapsedRealtime();
                 try {
                     embedding = ClipClassifier.encodeImageEmbedding(getApplicationContext(), asset);
                 } catch (Throwable t) {
                     Log.w(TAG, "clip encode failed: " + asset.contentUri, t);
                 }
+                double dur = SystemClock.elapsedRealtime() - t0;
                 if (embedding != null) {
                     FeatureRecord record = new FeatureRecord();
                     record.mediaKey = asset.contentUri;
@@ -171,16 +177,21 @@ public class ClipEmbeddingWorker extends Worker {
                     record.updatedAt = System.currentTimeMillis() / 1000L;
                     featureDao.upsert(record);
                     clipCount++;
+                    HashMap<String, Object> extra = new HashMap<>();
+                    extra.put("media", asset.contentUri);
+                    PerfLogger.log("clip_encode", dur, perfSession, extra);
                 }
             }
             if (needDino) {
                 if (isStopped()) return;
                 float[] embedding = null;
+                long t0 = SystemClock.elapsedRealtime();
                 try {
                     embedding = DinoImageEmbedder.encode(getApplicationContext(), asset);
                 } catch (Throwable t) {
                     Log.w(TAG, "dino encode failed: " + asset.contentUri, t);
                 }
+                double dur = SystemClock.elapsedRealtime() - t0;
                 if (embedding != null) {
                     FeatureRecord record = new FeatureRecord();
                     record.mediaKey = asset.contentUri;
@@ -190,6 +201,9 @@ public class ClipEmbeddingWorker extends Worker {
                     record.updatedAt = System.currentTimeMillis() / 1000L;
                     featureDao.upsert(record);
                     dinoCount++;
+                    HashMap<String, Object> extra = new HashMap<>();
+                    extra.put("media", asset.contentUri);
+                    PerfLogger.log("dino_encode", dur, perfSession, extra);
                 }
             }
             if (needFace) {
@@ -203,8 +217,15 @@ public class ClipEmbeddingWorker extends Worker {
                 if (isStopped()) return;
                 android.graphics.Bitmap bmp = com.example.photos.search.ImageSearchEngine.decodeKeepAspect(getApplicationContext(), android.net.Uri.parse(asset.contentUri), 960);
                 if (bmp != null) {
+                    long tFace = SystemClock.elapsedRealtime();
                     float[][] faces = sface.embedAll(bmp);
+                    double durFace = SystemClock.elapsedRealtime() - tFace;
                     bmp.recycle();
+                    int faceCnt = faces == null ? 0 : faces.length;
+                    HashMap<String, Object> extraFace = new HashMap<>();
+                    extraFace.put("media", asset.contentUri);
+                    extraFace.put("faces", faceCnt);
+                    PerfLogger.log("face_encode", durFace, perfSession, extraFace);
                     if (faces != null && faces.length > 0) {
                         int fid = 0;
                         for (float[] f : faces) {
@@ -225,7 +246,7 @@ public class ClipEmbeddingWorker extends Worker {
         }
     }
 
-    private void rebuildHnsw(FeatureDao featureDao) {
+    private void rebuildHnsw(FeatureDao featureDao, String perfSession) {
         try {
             List<FeatureRecord> records = featureDao.getAllByType(FeatureType.DINO_IMAGE_EMB.getCode());
             if (records == null || records.isEmpty()) return;
@@ -234,15 +255,21 @@ public class ClipEmbeddingWorker extends Worker {
             if (dim <= 0) return;
             if (isStopped()) return;
             HnswImageIndex idx = new HnswImageIndex(getApplicationContext(), "dino_hnsw.index");
+            long t0 = SystemClock.elapsedRealtime();
             idx.build(HnswImageIndex.fromRecords(records, dim, false), dim);
             idx.save();
+            double dur = SystemClock.elapsedRealtime() - t0;
+            HashMap<String, Object> extra = new HashMap<>();
+            extra.put("size", records.size());
+            extra.put("dim", dim);
+            PerfLogger.log("hnsw_build_dino", dur, perfSession, extra);
             Log.i(TAG, "HNSW rebuilt size=" + records.size() + " dim=" + dim);
         } catch (Throwable t) {
             Log.w(TAG, "HNSW rebuild failed", t);
         }
     }
 
-    private void rebuildFaceHnsw(FeatureDao featureDao) {
+    private void rebuildFaceHnsw(FeatureDao featureDao, String perfSession) {
         try {
             List<FeatureRecord> records = featureDao.getAllByType(FeatureType.FACE_SFACE_EMB.getCode());
             if (records == null || records.isEmpty()) return;
@@ -251,15 +278,21 @@ public class ClipEmbeddingWorker extends Worker {
             if (dim <= 0) return;
             if (isStopped()) return;
             HnswImageIndex idx = new HnswImageIndex(getApplicationContext(), "face_hnsw.index");
+            long t0 = SystemClock.elapsedRealtime();
             idx.build(HnswImageIndex.fromRecords(records, dim, true), dim);
             idx.save();
+            double dur = SystemClock.elapsedRealtime() - t0;
+            HashMap<String, Object> extra = new HashMap<>();
+            extra.put("size", records.size());
+            extra.put("dim", dim);
+            PerfLogger.log("hnsw_build_face", dur, perfSession, extra);
             Log.i(TAG, "Face HNSW rebuilt size=" + records.size() + " dim=" + dim);
         } catch (Throwable t) {
             Log.w(TAG, "Face HNSW rebuild failed", t);
         }
     }
 
-    private void rebuildClipHnsw(FeatureDao featureDao) {
+    private void rebuildClipHnsw(FeatureDao featureDao, String perfSession) {
         try {
             List<FeatureRecord> records = featureDao.getAllByType(FeatureType.CLIP_IMAGE_EMB.getCode());
             if (records == null || records.isEmpty()) return;
@@ -268,8 +301,14 @@ public class ClipEmbeddingWorker extends Worker {
             if (dim <= 0) return;
             if (isStopped()) return;
             HnswImageIndex idx = new HnswImageIndex(getApplicationContext(), "clip_hnsw.index");
+            long t0 = SystemClock.elapsedRealtime();
             idx.build(HnswImageIndex.fromRecords(records, dim, false), dim);
             idx.save();
+            double dur = SystemClock.elapsedRealtime() - t0;
+            HashMap<String, Object> extra = new HashMap<>();
+            extra.put("size", records.size());
+            extra.put("dim", dim);
+            PerfLogger.log("hnsw_build_clip", dur, perfSession, extra);
             Log.i(TAG, "CLIP HNSW rebuilt size=" + records.size() + " dim=" + dim);
         } catch (Throwable t) {
             Log.w(TAG, "CLIP HNSW rebuild failed", t);

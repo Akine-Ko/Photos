@@ -1,6 +1,7 @@
 package com.example.photos.search;
 
 import android.content.Context;
+import android.os.SystemClock;
 
 import com.example.photos.data.MediaStoreRepository;
 import com.example.photos.db.FeatureDao;
@@ -11,10 +12,12 @@ import com.example.photos.db.PhotosDb;
 import com.example.photos.features.FeatureEncoding;
 import com.example.photos.features.FeatureType;
 import com.example.photos.model.Photo;
+import com.example.photos.util.PerfLogger;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -35,8 +38,11 @@ public final class TextSearchEngine {
     }
 
     public static List<SearchResult> search(Context context, String query, int limit) {
+        long totalStart = SystemClock.elapsedRealtime();
+        String perfSession = "text-" + System.currentTimeMillis();
         String prepared = query == null ? "" : query.trim();
         String translated = prepared;
+        long translateStart = SystemClock.elapsedRealtime();
         try {
             OnnxZhEnTranslator translator = OnnxZhEnTranslator.getInstance(context);
             if (translator != null) {
@@ -46,7 +52,16 @@ public final class TextSearchEngine {
             android.util.Log.w(TAG, "Translator unavailable, fallback to raw text", t);
             translated = prepared;
         }
+        double translateMs = SystemClock.elapsedRealtime() - translateStart;
+        HashMap<String, Object> translateExtra = new HashMap<>();
+        translateExtra.put("raw_len", prepared.length());
+        translateExtra.put("translated_len", translated.length());
+        PerfLogger.log("text_translate", translateMs, perfSession, translateExtra);
+
+        long encodeStart = SystemClock.elapsedRealtime();
         float[] textEmbedding = ClipTextEncoder.encode(context, translated);
+        double encodeMs = SystemClock.elapsedRealtime() - encodeStart;
+        PerfLogger.log("text_encode", encodeMs, perfSession, null);
         if (textEmbedding == null) {
             android.util.Log.w(TAG, "textEmbedding is null");
             return Collections.emptyList();
@@ -59,10 +74,20 @@ public final class TextSearchEngine {
             return Collections.emptyList();
         }
         android.util.Log.i(TAG, "search query=\"" + query + "\" translated=\"" + translated + "\" textDim=" + textEmbedding.length + " vectors=" + records.size());
+        long annStart = SystemClock.elapsedRealtime();
+        boolean usedHnsw = false;
         List<SearchResultInternal> ordered = searchWithHnsw(context, textEmbedding, limit);
         if (ordered == null) {
             ordered = linearSearch(records, textEmbedding, limit);
+        } else {
+            usedHnsw = true;
         }
+        double annMs = SystemClock.elapsedRealtime() - annStart;
+        HashMap<String, Object> annExtra = new HashMap<>();
+        annExtra.put("used_hnsw", usedHnsw);
+        annExtra.put("limit", limit);
+        annExtra.put("vectors", records.size());
+        PerfLogger.log("text_search_ann", annMs, perfSession, annExtra);
         // Log top scores for debugging/search visibility in logcat.
         if (!ordered.isEmpty()) {
             int logCount = Math.min(5, ordered.size());
@@ -82,6 +107,12 @@ public final class TextSearchEngine {
                 out.add(new SearchResult(photo, internal.score));
             }
         }
+        double totalMs = SystemClock.elapsedRealtime() - totalStart;
+        HashMap<String, Object> totalExtra = new HashMap<>();
+        totalExtra.put("used_hnsw", usedHnsw);
+        totalExtra.put("limit", limit);
+        totalExtra.put("results", out.size());
+        PerfLogger.log("text_search_total", totalMs, perfSession, totalExtra);
         return out;
     }
 

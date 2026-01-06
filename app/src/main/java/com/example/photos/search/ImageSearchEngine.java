@@ -3,6 +3,7 @@ package com.example.photos.search;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.SystemClock;
 
 import androidx.annotation.Nullable;
 
@@ -16,6 +17,7 @@ import com.example.photos.features.FeatureEncoding;
 import com.example.photos.features.FeatureType;
 import com.example.photos.model.Photo;
 import com.example.photos.search.face.SFaceOpenCv;
+import com.example.photos.util.PerfLogger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,6 +70,8 @@ public final class ImageSearchEngine {
             return Collections.emptyList();
         }
         final int topK = Math.max(1, limit);
+        String perfSession = "img-" + System.currentTimeMillis();
+        long totalStart = SystemClock.elapsedRealtime();
         Context app = context.getApplicationContext();
         PhotosDb db = PhotosDb.get(app);
         FeatureDao featureDao = db.featureDao();
@@ -76,8 +80,16 @@ public final class ImageSearchEngine {
             android.util.Log.w(TAG, "query embedding is null");
             return Collections.emptyList();
         }
-        List<SearchResultInternal> ordered = searchWithIndex(app, featureDao, query, topK);
-        ordered = rerankByFace(app, featureDao, ordered, queryAsset, topK);
+        long annStart = SystemClock.elapsedRealtime();
+        SearchWithIndexResult indexed = searchWithIndex(app, featureDao, query, topK);
+        double annMs = SystemClock.elapsedRealtime() - annStart;
+        List<SearchResultInternal> ordered = indexed.results;
+        HashMap<String, Object> annExtra = new HashMap<>();
+        annExtra.put("used_hnsw", indexed.usedHnsw);
+        annExtra.put("limit", topK);
+        annExtra.put("results", ordered == null ? 0 : ordered.size());
+        PerfLogger.log("image_search_ann", annMs, perfSession, annExtra);
+        ordered = rerankByFace(app, featureDao, ordered, queryAsset, topK, perfSession);
 
         List<SearchResult> out = new ArrayList<>();
         PhotoDao photoDao = db.photoDao();
@@ -91,17 +103,25 @@ public final class ImageSearchEngine {
                 }
             }
         }
+        double totalMs = SystemClock.elapsedRealtime() - totalStart;
+        HashMap<String, Object> totalExtra = new HashMap<>();
+        totalExtra.put("used_hnsw", indexed.usedHnsw);
+        totalExtra.put("limit", topK);
+        totalExtra.put("results", out.size());
+        PerfLogger.log("image_search_total", totalMs, perfSession, totalExtra);
         return out;
     }
 
-    private static List<SearchResultInternal> searchWithIndex(Context app, FeatureDao featureDao, float[] query, int topK) {
+    private static SearchWithIndexResult searchWithIndex(Context app, FeatureDao featureDao, float[] query, int topK) {
         HnswImageIndex hnsw = new HnswImageIndex(app, "dino_hnsw.index");
+        boolean usedHnsw = false;
         if (hnsw.loadIfExists()) {
+            usedHnsw = true;
             Map<String, Float> best = new LinkedHashMap<>();
             var res = hnsw.search(query, topK);
             for (var r : res) {
                 String key = parseMediaKey(r.item().id());
-                float score = (float) (-r.distance()); // cosine distance -> 越大越相似
+                float score = (float) (-r.distance()); // cosine distance -> similarity
                 Float cur = best.get(key);
                 if (cur == null || score > cur) {
                     best.put(key, score);
@@ -114,14 +134,14 @@ public final class ImageSearchEngine {
             ordered.sort((a, b) -> Float.compare(b.score, a.score));
             android.util.Log.i(TAG, "HNSW search used, got=" + ordered.size());
             if (ordered.size() > topK) {
-                return ordered.subList(0, topK);
+                return new SearchWithIndexResult(ordered.subList(0, topK), usedHnsw);
             }
-            return ordered;
+            return new SearchWithIndexResult(ordered, usedHnsw);
         }
         List<FeatureRecord> records = featureDao.getAllByType(FeatureType.DINO_IMAGE_EMB.getCode());
         List<SearchResultInternal> ordered = linearSearch(records, query, topK);
         android.util.Log.i(TAG, "HNSW missing -> linear search, results=" + ordered.size());
-        return ordered;
+        return new SearchWithIndexResult(ordered, usedHnsw);
     }
 
     private static List<SearchResultInternal> linearSearch(List<FeatureRecord> records, float[] query, int topK) {
@@ -187,26 +207,37 @@ public final class ImageSearchEngine {
                                                            FeatureDao featureDao,
                                                            List<SearchResultInternal> base,
                                                            PhotoAsset queryAsset,
-                                                           int topK) {
+                                                           int topK,
+                                                           String perfSession) {
+        long start = SystemClock.elapsedRealtime();
+        int faceCount = 0;
+        int candidateCount = 0;
+        boolean ran = false;
         SFaceOpenCv recognizer;
         try {
             recognizer = new SFaceOpenCv(ctx);
         } catch (Exception e) {
             android.util.Log.w(TAG, "face pipeline init failed", e);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
             return base;
         }
         Bitmap qbmp = decodeKeepAspect(ctx, Uri.parse(queryAsset.contentUri), 960);
         if (qbmp == null) {
             android.util.Log.i(TAG, "face rerank: query bitmap null");
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
             return base;
         }
         float[][] qfaces = recognizer.embedAll(qbmp);
         qbmp.recycle();
         if (qfaces == null || qfaces.length == 0) {
             android.util.Log.i(TAG, "face rerank: query face embedding null");
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
             return base;
         }
+        faceCount = qfaces.length;
         Map<String, Float> faceSims = loadFaceCandidates(ctx, featureDao, qfaces, topK * 5);
+        candidateCount = faceSims.size();
+        ran = true;
         Map<String, Float> baseMap = new LinkedHashMap<>();
         if (base != null) {
             for (SearchResultInternal s : base) {
@@ -237,8 +268,11 @@ public final class ImageSearchEngine {
         }
         fusedList.sort((a, b) -> Float.compare(b.score, a.score));
         if (fusedList.size() > topK) {
-            return fusedList.subList(0, topK);
+            List<SearchResultInternal> out = fusedList.subList(0, topK);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+            return out;
         }
+        logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
         return fusedList;
     }
 
@@ -311,6 +345,25 @@ public final class ImageSearchEngine {
             return id.substring(0, pos);
         }
         return id;
+    }
+
+    private static void logFaceRerank(String session, long startMs, int faceCount, int candidates, boolean ran) {
+        double dur = SystemClock.elapsedRealtime() - startMs;
+        HashMap<String, Object> extra = new HashMap<>();
+        extra.put("query_faces", faceCount);
+        extra.put("candidates", candidates);
+        extra.put("ran", ran);
+        PerfLogger.log("image_search_face_rerank", dur, session, extra);
+    }
+
+    private static final class SearchWithIndexResult {
+        final List<SearchResultInternal> results;
+        final boolean usedHnsw;
+
+        SearchWithIndexResult(List<SearchResultInternal> results, boolean usedHnsw) {
+            this.results = results == null ? Collections.emptyList() : results;
+            this.usedHnsw = usedHnsw;
+        }
     }
 
     private static final class SearchResultInternal {
