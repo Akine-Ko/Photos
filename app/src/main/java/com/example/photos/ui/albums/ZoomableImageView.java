@@ -37,6 +37,7 @@ public class ZoomableImageView extends AppCompatImageView {
     private boolean isDragging = false;
     private ValueAnimator resetAnimator;
     private OnTransformListener transformListener;
+    private boolean scalingInProgress = false;
 
     public ZoomableImageView(Context context) {
         this(context, null);
@@ -79,7 +80,13 @@ public class ZoomableImageView extends AppCompatImageView {
                 getParent().requestDisallowInterceptTouchEvent(getCurrentScale() > PAN_THRESHOLD);
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (!isDragging || event.getPointerCount() > 1) break;
+                if (event.getPointerCount() > 1 || scalingInProgress) {
+                    lastX = event.getX();
+                    lastY = event.getY();
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    return true; // let scale detector handle
+                }
+                if (!isDragging) break;
                 if (getCurrentScale() <= PAN_THRESHOLD) {
                     getParent().requestDisallowInterceptTouchEvent(false);
                     return false; // let parent (ViewPager) handle swipe when not zoomed
@@ -88,6 +95,16 @@ public class ZoomableImageView extends AppCompatImageView {
                 float dy = event.getY() - lastY;
                 lastX = event.getX();
                 lastY = event.getY();
+                RectF rect = getDisplayRect();
+                if (rect != null) {
+                    boolean atLeft = rect.left >= -1f;
+                    boolean atRight = rect.right <= getWidth() + 1f;
+                    if ((atLeft && dx > 0) || (atRight && dx < 0)) {
+                        // Hit image edge: allow parent (ViewPager) to take over for page swipe.
+                        getParent().requestDisallowInterceptTouchEvent(false);
+                        return false;
+                    }
+                }
                 translate(dx, dy);
                 if (transformListener != null) transformListener.onTransform();
                 break;
@@ -232,10 +249,22 @@ public class ZoomableImageView extends AppCompatImageView {
 
     private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
         @Override
+        public boolean onScaleBegin(ScaleGestureDetector detector) {
+            scalingInProgress = true;
+            getParent().requestDisallowInterceptTouchEvent(true);
+            return true;
+        }
+
+        @Override
         public boolean onScale(ScaleGestureDetector detector) {
             scale(detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
             if (transformListener != null) transformListener.onTransform();
             return true;
+        }
+
+        @Override
+        public void onScaleEnd(ScaleGestureDetector detector) {
+            scalingInProgress = false;
         }
     }
 
@@ -243,6 +272,7 @@ public class ZoomableImageView extends AppCompatImageView {
         if (resetAnimator != null && resetAnimator.isRunning()) {
             resetAnimator.cancel();
         }
+        supportMatrix.getValues(matrixValues);
         final float startScale = getCurrentScale();
         final float startTransX = matrixValues[Matrix.MTRANS_X];
         final float startTransY = matrixValues[Matrix.MTRANS_Y];
