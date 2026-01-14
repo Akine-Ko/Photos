@@ -76,6 +76,13 @@
     <string name="manage_media_permission_needed">需要媒体管理权限才能删除，请在授权弹窗中允许</string>
     <string name="back">返回</string>
     <string name="edit">编辑</string>
+    <string name="edit_loading">正在加载原图…</string>
+    <string name="edit_rotate_left">左转</string>
+    <string name="edit_rotate_right">右转</string>
+    <string name="edit_save_copy">另存为</string>
+    <string name="edit_save_success">已另存为新照片</string>
+    <string name="edit_save_failed">保存失败，请稍后重试</string>
+    <string name="edit_save_cancelled">未做任何修改</string>
     <string name="more">更多</string>
     <string name="profile_search_limit_title">搜索返回条数</string>
     <string name="profile_search_limit_summary">用于文本搜索/以图搜图的最大返回项，默认 4 张。</string>

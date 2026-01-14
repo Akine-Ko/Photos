@@ -151,36 +151,6 @@
             </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/albumViewerEditButtonContainer"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingBottom="8dp"
-            android:contentDescription="@string/edit"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                <ImageButton
-                    android:id="@+id/albumViewerEditButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@android:color/transparent"
-                    android:clickable="false"
-                    android:focusable="false"
-                    android:contentDescription="@string/edit"
-                    android:src="@drawable/ic_edit_custom" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/edit"
-                    android:textColor="@android:color/black"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-        <LinearLayout
             android:id="@+id/albumViewerAddToButtonContainer"
             android:layout_width="0dp"
             android:layout_height="match_parent"

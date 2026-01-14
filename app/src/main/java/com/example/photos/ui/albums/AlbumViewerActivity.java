@@ -19,11 +19,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.EditText;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.graphics.Typeface;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -110,8 +110,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
         View shareButtonContainer = findViewById(R.id.albumViewerShareButtonContainer);
         ImageButton deleteButton = findViewById(R.id.albumViewerDeleteButton);
         View deleteButtonContainer = findViewById(R.id.albumViewerDeleteButtonContainer);
-        ImageButton editButton = findViewById(R.id.albumViewerEditButton);
-        View editButtonContainer = findViewById(R.id.albumViewerEditButtonContainer);
         ImageButton addToButton = findViewById(R.id.albumViewerAddToButton);
         View addToButtonContainer = findViewById(R.id.albumViewerAddToButtonContainer);
         ImageButton infoButton = findViewById(R.id.albumViewerInfoButton);
@@ -146,11 +144,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
                     }
                     clearPendingManage();
                 });
-
         backButton.setOnClickListener(v -> finishWithResult());
         View.OnClickListener shareClickListener = v -> shareCurrent();
         View.OnClickListener deleteClickListener = v -> deleteCurrent();
-        View.OnClickListener editClickListener = v -> Toast.makeText(this, R.string.edit, Toast.LENGTH_SHORT).show();
         View.OnClickListener addToClickListener = v -> showAddToAlbum();
         if (shareButtonContainer != null) {
             shareButtonContainer.setOnClickListener(shareClickListener);
@@ -161,11 +157,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
             deleteButtonContainer.setOnClickListener(deleteClickListener);
         } else {
             deleteButton.setOnClickListener(deleteClickListener);
-        }
-        if (editButtonContainer != null) {
-            editButtonContainer.setOnClickListener(editClickListener);
-        } else {
-            editButton.setOnClickListener(editClickListener);
         }
         if (addToButtonContainer != null) {
             addToButtonContainer.setOnClickListener(addToClickListener);
@@ -186,7 +177,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 entries.add(new PhotoEntry(id, url, date));
             }
         }
-        adapter = new AlbumPagerAdapter(entries, this::toggleChrome);
+        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -241,6 +232,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
         topBar.setVisibility(newVisibility);
         bottomPanel.setVisibility(newVisibility);
         updateSystemBars(chromeVisible, findViewById(R.id.albumViewerRoot));
+    }
+
+    private void hideChrome() {
+        if (topBar == null || bottomPanel == null) return;
+        if (!chromeVisible) return;
+        chromeVisible = false;
+        topBar.setVisibility(View.GONE);
+        bottomPanel.setVisibility(View.GONE);
+        updateSystemBars(false, findViewById(R.id.albumViewerRoot));
     }
 
     private void showInfoForCurrent() {
@@ -906,10 +906,12 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
         private final List<PhotoEntry> items;
         private final Runnable onToggleChrome;
+        private final Runnable onHideChrome;
 
-        AlbumPagerAdapter(@NonNull List<PhotoEntry> items, Runnable onToggleChrome) {
+        AlbumPagerAdapter(@NonNull List<PhotoEntry> items, Runnable onToggleChrome, Runnable onHideChrome) {
             this.items = items == null ? new ArrayList<>() : items;
             this.onToggleChrome = onToggleChrome;
+            this.onHideChrome = onHideChrome;
         }
 
         @NonNull
@@ -931,7 +933,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            private final ImageView imageView;
+            private final com.example.photos.ui.albums.ZoomableImageView imageView;
 
             ViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -940,6 +942,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
             void bind(PhotoEntry entry) {
                 if (entry == null) return;
+                if (imageView != null) {
+                    imageView.resetZoom();
+                    imageView.setOnClickListener(v -> {
+                        if (onToggleChrome != null) onToggleChrome.run();
+                    });
+                    imageView.setOnTransformListener(() -> {
+                        if (onHideChrome != null) onHideChrome.run();
+                    });
+                }
                 Glide.with(imageView.getContext())
                         .load(entry.url)
                         .apply(VIEWER_OPTIONS)
