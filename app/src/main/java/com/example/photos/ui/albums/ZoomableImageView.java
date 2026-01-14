@@ -11,9 +11,11 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.graphics.Bitmap;
+import android.widget.OverScroller;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageView;
+import androidx.core.view.ViewCompat;
 
 /**
  * Simple pinch-to-zoom ImageView for the album viewer.
@@ -38,6 +40,8 @@ public class ZoomableImageView extends AppCompatImageView {
     private ValueAnimator resetAnimator;
     private OnTransformListener transformListener;
     private boolean scalingInProgress = false;
+    private final OverScroller scroller;
+    private final FlingRunner flingRunner;
 
     public ZoomableImageView(Context context) {
         this(context, null);
@@ -63,7 +67,19 @@ public class ZoomableImageView extends AppCompatImageView {
                 performClick();
                 return true;
             }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (getCurrentScale() <= PAN_THRESHOLD) {
+                    return false;
+                }
+                getParent().requestDisallowInterceptTouchEvent(true);
+                flingRunner.start((int) velocityX, (int) velocityY);
+                return true;
+            }
         });
+        scroller = new OverScroller(context);
+        flingRunner = new FlingRunner();
     }
 
     @Override
@@ -74,6 +90,7 @@ public class ZoomableImageView extends AppCompatImageView {
 
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                scroller.forceFinished(true);
                 lastX = event.getX();
                 lastY = event.getY();
                 isDragging = true;
@@ -303,5 +320,34 @@ public class ZoomableImageView extends AppCompatImageView {
 
     public interface OnTransformListener {
         void onTransform();
+    }
+
+    private class FlingRunner implements Runnable {
+        private int lastX = 0;
+        private int lastY = 0;
+
+        void start(int velocityX, int velocityY) {
+            lastX = 0;
+            lastY = 0;
+            scroller.forceFinished(true);
+            scroller.fling(0, 0, velocityX, velocityY, -10000, 10000, -10000, 10000);
+            ViewCompat.postOnAnimation(ZoomableImageView.this, this);
+        }
+
+        @Override
+        public void run() {
+            if (scroller.isFinished() || !scroller.computeScrollOffset()) {
+                return;
+            }
+            int currX = scroller.getCurrX();
+            int currY = scroller.getCurrY();
+            float dx = currX - lastX;
+            float dy = currY - lastY;
+            lastX = currX;
+            lastY = currY;
+            translate(dx, dy);
+            if (transformListener != null) transformListener.onTransform();
+            ViewCompat.postOnAnimation(ZoomableImageView.this, this);
+        }
     }
 }
