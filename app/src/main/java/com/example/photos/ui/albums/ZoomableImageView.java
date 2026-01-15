@@ -29,6 +29,11 @@ public class ZoomableImageView extends AppCompatImageView {
     private final float[] matrixValues = new float[9];
     private final RectF contentRect = new RectF();
     private static final float PAN_THRESHOLD = 1.05f; // allow ViewPager when near base scale
+    // Enter almost immediately when pinching out; only stay in filmstrip after a deep shrink.
+    public static final float FILMSTRIP_ENTER = 0.995f; // show neighbors almost immediately
+    public static final float FILMSTRIP_EXIT = 0.97f;   // exit filmstrip when zoomed back
+    public static final float FILMSTRIP_COMMIT = 0.82f; // must shrink past this to avoid snap-back
+    private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
@@ -39,6 +44,7 @@ public class ZoomableImageView extends AppCompatImageView {
     private boolean isDragging = false;
     private ValueAnimator resetAnimator;
     private OnTransformListener transformListener;
+    private OnScaleChangeListener scaleChangeListener;
     private boolean scalingInProgress = false;
     private final OverScroller scroller;
     private final FlingRunner flingRunner;
@@ -91,10 +97,16 @@ public class ZoomableImageView extends AppCompatImageView {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 scroller.forceFinished(true);
+                if (resetAnimator != null && resetAnimator.isRunning()) {
+                    resetAnimator.cancel();
+                }
                 lastX = event.getX();
                 lastY = event.getY();
                 isDragging = true;
                 getParent().requestDisallowInterceptTouchEvent(getCurrentScale() > PAN_THRESHOLD);
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                // Keep receiving events; snap-back is handled when the last finger leaves.
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (event.getPointerCount() > 1 || scalingInProgress) {
@@ -106,7 +118,7 @@ public class ZoomableImageView extends AppCompatImageView {
                 if (!isDragging) break;
                 if (getCurrentScale() <= PAN_THRESHOLD) {
                     getParent().requestDisallowInterceptTouchEvent(false);
-                    return false; // let parent (ViewPager) handle swipe when not zoomed
+                    return true; // keep receiving events even if pager intercepts next
                 }
                 float dx = event.getX() - lastX;
                 float dy = event.getY() - lastY;
@@ -114,18 +126,26 @@ public class ZoomableImageView extends AppCompatImageView {
                 lastY = event.getY();
                 RectF rect = getDisplayRect();
                 if (rect != null) {
-                    boolean atLeft = rect.left >= -1f;
-                    boolean atRight = rect.right <= getWidth() + 1f;
+                    boolean atLeft = rect.left >= -EDGE_HANDOFF_TOLERANCE;
+                    boolean atRight = rect.right <= getWidth() + EDGE_HANDOFF_TOLERANCE;
                     if ((atLeft && dx > 0) || (atRight && dx < 0)) {
                         // Hit image edge: allow parent (ViewPager) to take over for page swipe.
                         getParent().requestDisallowInterceptTouchEvent(false);
-                        return false;
+                        return true;
                     }
                 }
+                getParent().requestDisallowInterceptTouchEvent(true);
                 translate(dx, dy);
                 if (transformListener != null) transformListener.onTransform();
                 break;
             case MotionEvent.ACTION_UP:
+                isDragging = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+                // Only snap when最后一根手指抬起，避免中途抖动反复回弹。
+                if (event.getPointerCount() == 1 && !scalingInProgress) {
+                    maybeSnapBack();
+                }
+                break;
             case MotionEvent.ACTION_CANCEL:
                 isDragging = false;
                 getParent().requestDisallowInterceptTouchEvent(false);
@@ -187,10 +207,11 @@ public class ZoomableImageView extends AppCompatImageView {
         baseMatrix.postTranslate(dx, dy);
         minScale = 0.7f;
         applyMatrix();
+        notifyScaleChanged(false);
     }
 
     public void resetZoom() {
-        animateToIdentity();
+        animateToScale(1f);
     }
 
     @Override
@@ -202,6 +223,7 @@ public class ZoomableImageView extends AppCompatImageView {
         supportMatrix.postTranslate(dx, dy);
         checkBounds();
         applyMatrix();
+        notifyScaleChanged(false);
     }
 
     private void scale(float factor, float focusX, float focusY) {
@@ -215,6 +237,7 @@ public class ZoomableImageView extends AppCompatImageView {
         supportMatrix.postScale(factor, factor, focusX, focusY);
         checkBounds();
         applyMatrix();
+        notifyScaleChanged(true);
     }
 
     private void checkBounds() {
@@ -282,10 +305,12 @@ public class ZoomableImageView extends AppCompatImageView {
         @Override
         public void onScaleEnd(ScaleGestureDetector detector) {
             scalingInProgress = false;
+            notifyScaleChanged(true);
         }
     }
 
-    private void animateToIdentity() {
+    private void animateToScale(float targetScale) {
+        scroller.forceFinished(true);
         if (resetAnimator != null && resetAnimator.isRunning()) {
             resetAnimator.cancel();
         }
@@ -296,13 +321,13 @@ public class ZoomableImageView extends AppCompatImageView {
         final Matrix current = new Matrix();
         current.set(supportMatrix);
         resetAnimator = ValueAnimator.ofFloat(0f, 1f);
-        resetAnimator.setDuration(200);
+        resetAnimator.setDuration(260);
         resetAnimator.addUpdateListener(anim -> {
             float t = (float) anim.getAnimatedValue();
             supportMatrix.set(current);
             // Scale back to 1 gradually
-            float targetScale = 1f + (startScale - 1f) * (1f - t);
-            float deltaScale = targetScale / getCurrentScale();
+            float interpScale = startScale + (targetScale - startScale) * t;
+            float deltaScale = interpScale / getCurrentScale();
             supportMatrix.postScale(deltaScale, deltaScale, getWidth() / 2f, getHeight() / 2f);
             // Translate back to center
             float tx = startTransX * (1f - t);
@@ -310,6 +335,7 @@ public class ZoomableImageView extends AppCompatImageView {
             supportMatrix.postTranslate(tx - getTranslationX(), ty - getTranslationY());
             checkBounds();
             applyMatrix();
+            notifyScaleChanged(false);
         });
         resetAnimator.start();
     }
@@ -318,8 +344,16 @@ public class ZoomableImageView extends AppCompatImageView {
         this.transformListener = l;
     }
 
+    public void setOnScaleChangeListener(OnScaleChangeListener l) {
+        this.scaleChangeListener = l;
+    }
+
     public interface OnTransformListener {
         void onTransform();
+    }
+
+    public interface OnScaleChangeListener {
+        void onScale(float scale, boolean fromUser);
     }
 
     private class FlingRunner implements Runnable {
@@ -348,6 +382,20 @@ public class ZoomableImageView extends AppCompatImageView {
             translate(dx, dy);
             if (transformListener != null) transformListener.onTransform();
             ViewCompat.postOnAnimation(ZoomableImageView.this, this);
+        }
+    }
+
+    private void notifyScaleChanged(boolean fromUser) {
+        if (scaleChangeListener != null) {
+            scaleChangeListener.onScale(getCurrentScale(), fromUser);
+        }
+    }
+
+    private void maybeSnapBack() {
+        // Snap back to fit only if the user did not shrink past the filmstrip commit threshold.
+        float scale = getCurrentScale();
+        if (scale > FILMSTRIP_COMMIT && scale < 1f - 0.001f) {
+            animateToScale(1f);
         }
     }
 }

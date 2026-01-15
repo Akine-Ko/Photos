@@ -54,6 +54,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.io.File;
 import java.io.InputStream;
 
@@ -85,6 +86,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private int bottomBasePaddingBottom;
     private int lightBarColor = Color.WHITE;
     private int darkBarColor = Color.BLACK;
+    private boolean filmstripMode = false;
+    private int pagerPadStart = 0;
+    private int pagerPadEnd = 0;
+    private int pagerPadTop = 0;
+    private int pagerPadBottom = 0;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
     private PhotoEntry pendingDeleteEntry;
@@ -177,7 +183,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 entries.add(new PhotoEntry(id, url, date));
             }
         }
-        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome);
+        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome, this::onScaleChanged);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -241,6 +247,66 @@ public class AlbumViewerActivity extends AppCompatActivity {
         topBar.setVisibility(View.GONE);
         bottomPanel.setVisibility(View.GONE);
         updateSystemBars(false, findViewById(R.id.albumViewerRoot));
+    }
+
+    private void onScaleChanged(int position, float scale, boolean fromUser) {
+        if (pager == null) return;
+        if (position != pager.getCurrentItem()) return;
+        final float enter = ZoomableImageView.FILMSTRIP_ENTER;
+        final float exit = ZoomableImageView.FILMSTRIP_EXIT;
+        if (fromUser && !filmstripMode && scale <= enter) {
+            enterFilmstripMode();
+        }
+        if (filmstripMode && scale >= exit) {
+            exitFilmstripMode();
+        }
+    }
+
+    private void enterFilmstripMode() {
+        if (pager == null || filmstripMode) return;
+        filmstripMode = true;
+        final float pageMarginPx = dpToPx(16f);
+        final float scaleDown = 0.9f;
+        // Save original padding to restore later.
+        pagerPadStart = pager.getPaddingStart();
+        pagerPadEnd = pager.getPaddingEnd();
+        pagerPadTop = pager.getPaddingTop();
+        pagerPadBottom = pager.getPaddingBottom();
+        int side = (int) dpToPx(48f);
+        pager.setClipToPadding(false);
+        pager.setClipChildren(false);
+        ViewGroup rv = (ViewGroup) pager.getChildAt(0);
+        if (rv != null) {
+            rv.setClipToPadding(false);
+            rv.setClipChildren(false);
+        }
+        pager.setPadding(side, pagerPadTop, side, pagerPadBottom);
+        pager.setPageTransformer((page, position) -> {
+            float clampedPos = Math.max(-1f, Math.min(1f, position));
+            float scale = Math.max(scaleDown, 1 - Math.abs(clampedPos) * 0.12f);
+            page.setScaleY(scale);
+            page.setScaleX(scale);
+            page.setTranslationX(-pageMarginPx * clampedPos);
+        });
+        pager.setOffscreenPageLimit(3);
+    }
+
+    private void exitFilmstripMode() {
+        if (pager == null || !filmstripMode) return;
+        filmstripMode = false;
+        pager.setPageTransformer(null);
+        pager.setClipToPadding(true);
+        pager.setClipChildren(true);
+        ViewGroup rv = (ViewGroup) pager.getChildAt(0);
+        if (rv != null) {
+            rv.setClipToPadding(true);
+            rv.setClipChildren(true);
+        }
+        pager.setPadding(pagerPadStart, pagerPadTop, pagerPadEnd, pagerPadBottom);
+    }
+
+    private float dpToPx(float dp) {
+        return dp * getResources().getDisplayMetrics().density;
     }
 
     private void showInfoForCurrent() {
@@ -907,11 +973,16 @@ public class AlbumViewerActivity extends AppCompatActivity {
         private final List<PhotoEntry> items;
         private final Runnable onToggleChrome;
         private final Runnable onHideChrome;
+        private final TriConsumer<Integer, Float, Boolean> onScaleChange;
 
-        AlbumPagerAdapter(@NonNull List<PhotoEntry> items, Runnable onToggleChrome, Runnable onHideChrome) {
+        AlbumPagerAdapter(@NonNull List<PhotoEntry> items,
+                          Runnable onToggleChrome,
+                          Runnable onHideChrome,
+                          TriConsumer<Integer, Float, Boolean> onScaleChange) {
             this.items = items == null ? new ArrayList<>() : items;
             this.onToggleChrome = onToggleChrome;
             this.onHideChrome = onHideChrome;
+            this.onScaleChange = onScaleChange;
         }
 
         @NonNull
@@ -949,6 +1020,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
                     });
                     imageView.setOnTransformListener(() -> {
                         if (onHideChrome != null) onHideChrome.run();
+                    });
+                    imageView.setOnScaleChangeListener((scale, fromUser) -> {
+                        if (onScaleChange != null) {
+                            int pos = getBindingAdapterPosition();
+                            if (pos != RecyclerView.NO_POSITION) {
+                                onScaleChange.accept(pos, scale, fromUser);
+                            }
+                        }
                     });
                 }
                 Glide.with(imageView.getContext())
