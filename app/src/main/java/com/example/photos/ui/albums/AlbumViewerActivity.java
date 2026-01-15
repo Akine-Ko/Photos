@@ -256,8 +256,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         final float exit = ZoomableImageView.FILMSTRIP_EXIT;
         if (fromUser && !filmstripMode && scale <= enter) {
             enterFilmstripMode();
-        }
-        if (filmstripMode && scale >= exit) {
+        } else if (filmstripMode && scale >= exit) {
             exitFilmstripMode();
         }
     }

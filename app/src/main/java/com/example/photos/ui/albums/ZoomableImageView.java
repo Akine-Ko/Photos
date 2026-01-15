@@ -31,7 +31,7 @@ public class ZoomableImageView extends AppCompatImageView {
     private static final float PAN_THRESHOLD = 1.05f; // allow ViewPager when near base scale
     // Enter almost immediately when pinching out; only stay in filmstrip after a deep shrink.
     public static final float FILMSTRIP_ENTER = 0.995f; // show neighbors almost immediately
-    public static final float FILMSTRIP_EXIT = 0.97f;   // exit filmstrip when zoomed back
+    public static final float FILMSTRIP_EXIT = 0.999f;  // exit filmstrip when zoomed back (must be > enter)
     public static final float FILMSTRIP_COMMIT = 0.82f; // must shrink past this to avoid snap-back
     private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
@@ -141,7 +141,7 @@ public class ZoomableImageView extends AppCompatImageView {
             case MotionEvent.ACTION_UP:
                 isDragging = false;
                 getParent().requestDisallowInterceptTouchEvent(false);
-                // Only snap when最后一根手指抬起，避免中途抖动反复回弹。
+                // Only snap when the last finger lifts to avoid mid-gesture bounce.
                 if (event.getPointerCount() == 1 && !scalingInProgress) {
                     maybeSnapBack();
                 }
@@ -194,7 +194,6 @@ public class ZoomableImageView extends AppCompatImageView {
         Drawable d = getDrawable();
         if (d == null) return;
         baseMatrix.reset();
-        supportMatrix.reset();
         int viewWidth = getWidth() - getPaddingLeft() - getPaddingRight();
         int viewHeight = getHeight() - getPaddingTop() - getPaddingBottom();
         int dw = d.getIntrinsicWidth();
@@ -206,6 +205,7 @@ public class ZoomableImageView extends AppCompatImageView {
         baseMatrix.postScale(scale, scale);
         baseMatrix.postTranslate(dx, dy);
         minScale = 0.7f;
+        checkBounds(); // keep existing user matrix sane under new size
         applyMatrix();
         notifyScaleChanged(false);
     }
@@ -327,12 +327,15 @@ public class ZoomableImageView extends AppCompatImageView {
             supportMatrix.set(current);
             // Scale back to 1 gradually
             float interpScale = startScale + (targetScale - startScale) * t;
-            float deltaScale = interpScale / getCurrentScale();
+            float deltaScale = interpScale / startScale;
             supportMatrix.postScale(deltaScale, deltaScale, getWidth() / 2f, getHeight() / 2f);
-            // Translate back to center
-            float tx = startTransX * (1f - t);
-            float ty = startTransY * (1f - t);
-            supportMatrix.postTranslate(tx - getTranslationX(), ty - getTranslationY());
+            // Translate back to center using matrix deltas
+            supportMatrix.getValues(matrixValues);
+            float curTx = matrixValues[Matrix.MTRANS_X];
+            float curTy = matrixValues[Matrix.MTRANS_Y];
+            float targetTx = startTransX * (1f - t);
+            float targetTy = startTransY * (1f - t);
+            supportMatrix.postTranslate(targetTx - curTx, targetTy - curTy);
             checkBounds();
             applyMatrix();
             notifyScaleChanged(false);
