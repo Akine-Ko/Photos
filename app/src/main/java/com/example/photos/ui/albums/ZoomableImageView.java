@@ -32,7 +32,7 @@ public class ZoomableImageView extends AppCompatImageView {
     // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
     public static final float FILMSTRIP_ENTER = 0.98f;  // start revealing neighbors
     public static final float FILMSTRIP_EXIT = 0.995f;  // exit filmstrip when zoomed back (must be > enter)
-    public static final float FILMSTRIP_COMMIT = 0.90f; // must shrink past this to avoid snap-back
+    public static final float FILMSTRIP_COMMIT = 0.70f; // must shrink past this to avoid snap-back (matches minScale)
     private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
     private final ScaleGestureDetector scaleDetector;
@@ -204,7 +204,7 @@ public class ZoomableImageView extends AppCompatImageView {
         float dy = (viewHeight - dh * scale) * 0.5f;
         baseMatrix.postScale(scale, scale);
         baseMatrix.postTranslate(dx, dy);
-        minScale = 0.7f;
+        minScale = FILMSTRIP_COMMIT;
         checkBounds(); // keep existing user matrix sane under new size
         applyMatrix();
         notifyScaleChanged(false);
