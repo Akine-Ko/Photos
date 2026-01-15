@@ -29,10 +29,10 @@ public class ZoomableImageView extends AppCompatImageView {
     private final float[] matrixValues = new float[9];
     private final RectF contentRect = new RectF();
     private static final float PAN_THRESHOLD = 1.05f; // allow ViewPager when near base scale
-    // Enter almost immediately when pinching out; only stay in filmstrip after a deep shrink.
-    public static final float FILMSTRIP_ENTER = 0.995f; // show neighbors almost immediately
-    public static final float FILMSTRIP_EXIT = 0.999f;  // exit filmstrip when zoomed back (must be > enter)
-    public static final float FILMSTRIP_COMMIT = 0.82f; // must shrink past this to avoid snap-back
+    // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
+    public static final float FILMSTRIP_ENTER = 0.98f;  // start revealing neighbors
+    public static final float FILMSTRIP_EXIT = 0.995f;  // exit filmstrip when zoomed back (must be > enter)
+    public static final float FILMSTRIP_COMMIT = 0.90f; // must shrink past this to avoid snap-back
     private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
     private final ScaleGestureDetector scaleDetector;

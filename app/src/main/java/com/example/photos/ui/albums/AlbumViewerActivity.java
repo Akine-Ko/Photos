@@ -91,6 +91,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private int pagerPadEnd = 0;
     private int pagerPadTop = 0;
     private int pagerPadBottom = 0;
+    private boolean pagerPadCaptured = false;
+    private float filmstripPreviewProgress = 0f;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
     private PhotoEntry pendingDeleteEntry;
@@ -254,6 +256,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (position != pager.getCurrentItem()) return;
         final float enter = ZoomableImageView.FILMSTRIP_ENTER;
         final float exit = ZoomableImageView.FILMSTRIP_EXIT;
+        applyFilmstripPreviewProgress(scale);
         if (fromUser && !filmstripMode && scale <= enter) {
             enterFilmstripMode();
         } else if (filmstripMode && scale >= exit) {
@@ -264,44 +267,67 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private void enterFilmstripMode() {
         if (pager == null || filmstripMode) return;
         filmstripMode = true;
-        final float pageMarginPx = dpToPx(16f);
-        final float scaleDown = 0.9f;
-        // Save original padding to restore later.
-        pagerPadStart = pager.getPaddingStart();
-        pagerPadEnd = pager.getPaddingEnd();
-        pagerPadTop = pager.getPaddingTop();
-        pagerPadBottom = pager.getPaddingBottom();
-        int side = (int) dpToPx(48f);
-        pager.setClipToPadding(false);
-        pager.setClipChildren(false);
-        ViewGroup rv = (ViewGroup) pager.getChildAt(0);
-        if (rv != null) {
-            rv.setClipToPadding(false);
-            rv.setClipChildren(false);
-        }
-        pager.setPadding(side, pagerPadTop, side, pagerPadBottom);
-        pager.setPageTransformer((page, position) -> {
-            float clampedPos = Math.max(-1f, Math.min(1f, position));
-            float scale = Math.max(scaleDown, 1 - Math.abs(clampedPos) * 0.12f);
-            page.setScaleY(scale);
-            page.setScaleX(scale);
-            page.setTranslationX(-pageMarginPx * clampedPos);
-        });
+        applyFilmstripPreview(1f);
         pager.setOffscreenPageLimit(3);
     }
 
     private void exitFilmstripMode() {
         if (pager == null || !filmstripMode) return;
         filmstripMode = false;
-        pager.setPageTransformer(null);
-        pager.setClipToPadding(true);
-        pager.setClipChildren(true);
+        applyFilmstripPreview(0f);
+    }
+
+    private void applyFilmstripPreviewProgress(float scale) {
+        float start = 1f;
+        float end = ZoomableImageView.FILMSTRIP_ENTER;
+        float progress = 0f;
+        if (scale < start) {
+            progress = Math.min(1f, Math.max(0f, (start - scale) / (start - end)));
+        }
+        // If filmstrip mode is locked, force full progress.
+        if (filmstripMode) {
+            progress = 1f;
+        }
+        applyFilmstripPreview(progress);
+    }
+
+    private void capturePagerPaddingIfNeeded() {
+        if (pager == null || pagerPadCaptured) return;
+        pagerPadCaptured = true;
+        pagerPadStart = pager.getPaddingStart();
+        pagerPadEnd = pager.getPaddingEnd();
+        pagerPadTop = pager.getPaddingTop();
+        pagerPadBottom = pager.getPaddingBottom();
+    }
+
+    private void applyFilmstripPreview(float progress) {
+        if (pager == null) return;
+        capturePagerPaddingIfNeeded();
+        float clamped = Math.min(1f, Math.max(0f, progress));
+        filmstripPreviewProgress = clamped;
+        float sidePx = dpToPx(48f) * clamped;
+        boolean enable = clamped > 0f;
+        pager.setClipToPadding(!enable);
+        pager.setClipChildren(!enable);
         ViewGroup rv = (ViewGroup) pager.getChildAt(0);
         if (rv != null) {
-            rv.setClipToPadding(true);
-            rv.setClipChildren(true);
+            rv.setClipToPadding(!enable);
+            rv.setClipChildren(!enable);
         }
-        pager.setPadding(pagerPadStart, pagerPadTop, pagerPadEnd, pagerPadBottom);
+        pager.setPadding((int) (pagerPadStart + sidePx), pagerPadTop,
+                (int) (pagerPadEnd + sidePx), pagerPadBottom);
+        final float pageMarginPx = dpToPx(16f) * clamped;
+        final float scaleDown = 0.9f;
+        pager.setPageTransformer((page, position) -> {
+            float clampedPos = Math.max(-1f, Math.min(1f, position));
+            float posScale = 1f - 0.12f * clamped * Math.abs(clampedPos);
+            float base = 1f - (1f - scaleDown) * clamped;
+            float scaleVal = Math.max(base, posScale);
+            page.setScaleY(scaleVal);
+            page.setScaleX(scaleVal);
+            page.setTranslationX(-pageMarginPx * clampedPos);
+        });
+        pager.setOffscreenPageLimit(enable ? 3 : 1);
     }
 
     private float dpToPx(float dp) {
