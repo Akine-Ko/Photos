@@ -279,14 +279,10 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
     private void applyFilmstripPreviewProgress(float scale) {
         float start = 1f;
-        float end = ZoomableImageView.FILMSTRIP_ENTER;
+        float end = ZoomableImageView.FILMSTRIP_COMMIT;
         float progress = 0f;
-        if (scale < start) {
+        if (scale < start && start != end) {
             progress = Math.min(1f, Math.max(0f, (start - scale) / (start - end)));
-        }
-        // If filmstrip mode is locked, force full progress.
-        if (filmstripMode) {
-            progress = 1f;
         }
         applyFilmstripPreview(progress);
     }
