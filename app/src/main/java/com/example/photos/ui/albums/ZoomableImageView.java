@@ -32,7 +32,7 @@ public class ZoomableImageView extends AppCompatImageView {
     // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
     public static final float FILMSTRIP_ENTER = 0.98f;  // start revealing neighbors
     public static final float FILMSTRIP_EXIT = 0.995f;  // exit filmstrip when zoomed back (must be > enter)
-    public static final float FILMSTRIP_COMMIT = 0.70f; // must shrink past this to avoid snap-back (matches minScale)
+    public static final float FILMSTRIP_COMMIT = 0.82f; // must shrink past this to avoid snap-back (matches minScale)
     private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
     private final ScaleGestureDetector scaleDetector;
@@ -212,6 +212,17 @@ public class ZoomableImageView extends AppCompatImageView {
 
     public void resetZoom() {
         animateToScale(1f);
+    }
+
+    /**
+     * If the image is currently shrunk, animate it back to fit. Returns true if a reset started.
+     */
+    public boolean resetIfShrunk() {
+        if (getCurrentScale() < 0.999f) {
+            animateToScale(1f);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -397,7 +408,7 @@ public class ZoomableImageView extends AppCompatImageView {
     private void maybeSnapBack() {
         // Snap back to fit only if the user did not shrink past the filmstrip commit threshold.
         float scale = getCurrentScale();
-        if (scale > FILMSTRIP_COMMIT && scale < 1f - 0.001f) {
+        if (scale > minScale && scale < 1f - 0.001f) {
             animateToScale(1f);
         }
     }

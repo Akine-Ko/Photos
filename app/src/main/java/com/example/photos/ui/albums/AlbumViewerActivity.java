@@ -1036,9 +1036,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 if (entry == null) return;
                 if (imageView != null) {
                     imageView.resetZoom();
-                    imageView.setOnClickListener(v -> {
-                        if (onToggleChrome != null) onToggleChrome.run();
-                    });
+                    imageView.setOnClickListener(v -> handleClick());
                     imageView.setOnTransformListener(() -> {
                         if (onHideChrome != null) onHideChrome.run();
                     });
@@ -1057,9 +1055,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
                         .placeholder(R.drawable.ic_photo_placeholder)
                         .error(R.drawable.ic_photo_placeholder)
                         .into(imageView);
-                itemView.setOnClickListener(v -> {
-                    if (onToggleChrome != null) onToggleChrome.run();
-                });
+                itemView.setOnClickListener(v -> handleClick());
+            }
+
+            private void handleClick() {
+                if (imageView != null && imageView.resetIfShrunk()) {
+                    return;
+                }
+                if (onToggleChrome != null) onToggleChrome.run();
             }
         }
     }
