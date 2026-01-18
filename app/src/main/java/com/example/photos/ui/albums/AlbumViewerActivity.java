@@ -71,6 +71,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .dontAnimate()
             .dontTransform();
+    private static final float FILMSTRIP_FLING_BOOST = 1.35f;
 
     private final List<PhotoEntry> entries = new ArrayList<>();
     private final ArrayList<String> deletedIds = new ArrayList<>();
@@ -94,9 +95,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
     private float filmstripScale = 1f;
-    private RecyclerView pagerRecyclerView;
-    private float lastDragDx = 0f;
-    private int pagerScrollState = RecyclerView.SCROLL_STATE_IDLE;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
     private PhotoEntry pendingDeleteEntry;
@@ -193,36 +191,13 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 position -> filmstripMode ? filmstripScale : 1f);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
-        pagerRecyclerView = pager.getChildAt(0) instanceof RecyclerView ? (RecyclerView) pager.getChildAt(0) : null;
-        if (pagerRecyclerView != null) {
-            pagerRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-                @Override
-                public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                    if (filmstripMode && pagerScrollState == RecyclerView.SCROLL_STATE_DRAGGING) {
-                        lastDragDx = dx;
-                    }
-                }
-            });
-        }
+        installFilmstripFlingBoost();
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 updateCounter();
                 if (filmstripMode) {
                     pager.post(() -> syncFilmstripScaleToVisiblePages(false, true));
-                }
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                pagerScrollState = state;
-                if (!filmstripMode || pagerRecyclerView == null) return;
-                if (state == ViewPager2.SCROLL_STATE_SETTLING || state == ViewPager2.SCROLL_STATE_IDLE) {
-                    float nudge = lastDragDx * 0.35f;
-                    if (Math.abs(nudge) > 2f) {
-                        pagerRecyclerView.smoothScrollBy((int) nudge, 0);
-                    }
-                    lastDragDx = 0f;
                 }
             }
         });
@@ -263,6 +238,22 @@ public class AlbumViewerActivity extends AppCompatActivity {
             counterTextView.setVisibility(View.GONE);
         }
         updateThumbSelection();
+    }
+
+    private void installFilmstripFlingBoost() {
+        if (pager == null) return;
+        View child = pager.getChildAt(0);
+        if (!(child instanceof RecyclerView)) return;
+        RecyclerView recyclerView = (RecyclerView) child;
+        RecyclerView.OnFlingListener original = recyclerView.getOnFlingListener();
+        if (original == null) return;
+        recyclerView.setOnFlingListener(new RecyclerView.OnFlingListener() {
+            @Override
+            public boolean onFling(int velocityX, int velocityY) {
+                int boostedX = filmstripMode ? (int) (velocityX * FILMSTRIP_FLING_BOOST) : velocityX;
+                return original.onFling(boostedX, velocityY);
+            }
+        });
     }
 
     private void toggleChrome() {

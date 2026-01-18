@@ -93,6 +93,12 @@ public class ZoomableImageView extends AppCompatImageView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (getDrawable() == null) return super.onTouchEvent(event);
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN
+                && getCurrentScale() < 0.999f
+                && !scalingInProgress) {
+            // When scaled down (filmstrip), let the pager take the gesture immediately for reliable flings.
+            return false;
+        }
         gestureDetector.onTouchEvent(event);
         scaleDetector.onTouchEvent(event);
 
