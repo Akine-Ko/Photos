@@ -16,6 +16,7 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
@@ -71,7 +72,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .dontAnimate()
             .dontTransform();
-    private static final float FILMSTRIP_FLING_BOOST = 1.35f;
 
     private final List<PhotoEntry> entries = new ArrayList<>();
     private final ArrayList<String> deletedIds = new ArrayList<>();
@@ -191,7 +191,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 position -> filmstripMode ? filmstripScale : 1f);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
-        installFilmstripFlingBoost();
+        pager.setOnTouchListener((v, ev) -> {
+            if (!filmstripMode) return false;
+
+            ZoomableImageView current = findCurrentZoomView();
+            if (current == null) return false;
+
+            boolean consume = current.onExternalTouchEvent(ev);
+            return consume;
+        });
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
@@ -238,22 +246,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
             counterTextView.setVisibility(View.GONE);
         }
         updateThumbSelection();
-    }
-
-    private void installFilmstripFlingBoost() {
-        if (pager == null) return;
-        View child = pager.getChildAt(0);
-        if (!(child instanceof RecyclerView)) return;
-        RecyclerView recyclerView = (RecyclerView) child;
-        RecyclerView.OnFlingListener original = recyclerView.getOnFlingListener();
-        if (original == null) return;
-        recyclerView.setOnFlingListener(new RecyclerView.OnFlingListener() {
-            @Override
-            public boolean onFling(int velocityX, int velocityY) {
-                int boostedX = filmstripMode ? (int) (velocityX * FILMSTRIP_FLING_BOOST) : velocityX;
-                return original.onFling(boostedX, velocityY);
-            }
-        });
     }
 
     private void toggleChrome() {
@@ -317,6 +309,17 @@ public class AlbumViewerActivity extends AppCompatActivity {
             progress = Math.min(1f, Math.max(0f, (start - scale) / (start - end)));
         }
         applyFilmstripPreview(progress);
+    }
+
+    @Nullable
+    private ZoomableImageView findCurrentZoomView() {
+        if (pager == null) return null;
+        View child = pager.getChildAt(0);
+        if (!(child instanceof RecyclerView)) return null;
+        RecyclerView rv = (RecyclerView) child;
+        RecyclerView.ViewHolder vh = rv.findViewHolderForAdapterPosition(pager.getCurrentItem());
+        if (vh == null) return null;
+        return vh.itemView.findViewById(R.id.albumViewerImageView);
     }
 
     private void capturePagerPaddingIfNeeded() {

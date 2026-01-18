@@ -220,7 +220,8 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     public void resetZoom() {
-        animateToScale(1f);
+        clearDesiredScale();
+        animateToScale(1f, true);
     }
 
     /**
@@ -228,7 +229,8 @@ public class ZoomableImageView extends AppCompatImageView {
      */
     public boolean resetIfShrunk() {
         if (getCurrentScale() < 0.999f) {
-            animateToScale(1f);
+            clearDesiredScale();
+            animateToScale(1f, true);
             return true;
         }
         return false;
@@ -243,7 +245,7 @@ public class ZoomableImageView extends AppCompatImageView {
         if (getDrawable() == null || getWidth() == 0 || getHeight() == 0) return;
         float clamped = clamp(targetScale, minScale, maxScale);
         if (animate) {
-            animateToScale(clamped);
+            animateToScale(clamped, false);
         } else {
             setRelativeScaleImmediate(clamped);
         }
@@ -375,7 +377,7 @@ public class ZoomableImageView extends AppCompatImageView {
         }
     }
 
-    private void animateToScale(float targetScale) {
+    private void animateToScale(float targetScale, boolean fromUser) {
         scroller.forceFinished(true);
         if (resetAnimator != null && resetAnimator.isRunning()) {
             resetAnimator.cancel();
@@ -404,7 +406,7 @@ public class ZoomableImageView extends AppCompatImageView {
             supportMatrix.postTranslate(targetTx - curTx, targetTy - curTy);
             checkBounds();
             applyMatrix();
-            notifyScaleChanged(false);
+            notifyScaleChanged(fromUser);
         });
         resetAnimator.start();
     }
@@ -464,7 +466,24 @@ public class ZoomableImageView extends AppCompatImageView {
         // Snap back to fit only if the user did not shrink past the filmstrip commit threshold.
         float scale = getCurrentScale();
         if (scale > minScale && scale < 1f - 0.001f) {
-            animateToScale(1f);
+            clearDesiredScale();
+            animateToScale(1f, true);
         }
+    }
+
+    public boolean isScalingInProgress() {
+        return scalingInProgress;
+    }
+
+    public boolean onExternalTouchEvent(MotionEvent event) {
+        scaleDetector.onTouchEvent(event);
+
+        int action = event.getActionMasked();
+        if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) && !scalingInProgress) {
+            maybeSnapBack();
+        }
+
+        // Consume only when handling multi-touch / scaling; let single-finger events belong to the pager.
+        return event.getPointerCount() > 1 || scalingInProgress;
     }
 }
