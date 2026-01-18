@@ -37,6 +37,8 @@ public class ZoomableImageView extends AppCompatImageView {
 
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
+    private float desiredScale = 1f;
+    private boolean hasDesiredScale = false;
     private float minScale = 1f;
     private float maxScale = 6f;
     private float lastX;
@@ -207,6 +209,7 @@ public class ZoomableImageView extends AppCompatImageView {
         minScale = FILMSTRIP_COMMIT;
         checkBounds(); // keep existing user matrix sane under new size
         applyMatrix();
+        applyDesiredScaleIfNeeded();
         notifyScaleChanged(false);
     }
 
@@ -223,6 +226,52 @@ public class ZoomableImageView extends AppCompatImageView {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Request the view to maintain a target scale; applied immediately if drawable and size are ready.
+     */
+    public void setDesiredScale(float targetScale, boolean animate) {
+        hasDesiredScale = true;
+        desiredScale = targetScale;
+        if (getDrawable() == null || getWidth() == 0 || getHeight() == 0) return;
+        float clamped = clamp(targetScale, minScale, maxScale);
+        if (animate) {
+            animateToScale(clamped);
+        } else {
+            setRelativeScaleImmediate(clamped);
+        }
+    }
+
+    public void clearDesiredScale() {
+        hasDesiredScale = false;
+        desiredScale = 1f;
+    }
+
+    private void applyDesiredScaleIfNeeded() {
+        if (!hasDesiredScale) return;
+        if (getDrawable() == null || getWidth() == 0 || getHeight() == 0) return;
+        float target = clamp(desiredScale, minScale, maxScale);
+        if (Math.abs(getCurrentScale() - target) < 0.001f) return;
+        setRelativeScaleImmediate(target);
+    }
+
+    private float clamp(float val, float min, float max) {
+        return Math.max(min, Math.min(max, val));
+    }
+
+    /**
+     * Set absolute scale relative to base matrix without animation.
+     */
+    private void setRelativeScaleImmediate(float targetScale) {
+        supportMatrix.getValues(matrixValues);
+        float current = getCurrentScale();
+        if (current == 0f) return;
+        float delta = targetScale / current;
+        supportMatrix.postScale(delta, delta, getWidth() / 2f, getHeight() / 2f);
+        checkBounds();
+        applyMatrix();
+        notifyScaleChanged(false);
     }
 
     @Override

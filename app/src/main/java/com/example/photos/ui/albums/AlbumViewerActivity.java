@@ -93,6 +93,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private int pagerPadBottom = 0;
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
+    private float filmstripScale = 1f;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
     private PhotoEntry pendingDeleteEntry;
@@ -185,13 +186,17 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 entries.add(new PhotoEntry(id, url, date));
             }
         }
-        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome, this::onScaleChanged);
+        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome, this::onScaleChanged,
+                position -> filmstripMode ? filmstripScale : 1f);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 updateCounter();
+                if (filmstripMode) {
+                    pager.post(() -> syncFilmstripScaleToVisiblePages(false, true));
+                }
             }
         });
         pager.setCurrentItem(Math.max(0, Math.min(start, entries.size() - 1)), false);
@@ -257,10 +262,19 @@ public class AlbumViewerActivity extends AppCompatActivity {
         final float enter = ZoomableImageView.FILMSTRIP_ENTER;
         final float exit = ZoomableImageView.FILMSTRIP_EXIT;
         applyFilmstripPreviewProgress(scale);
+        if (fromUser && scale < 1f) {
+            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_COMMIT, Math.min(scale, 1f));
+            if (filmstripMode) {
+                syncFilmstripScaleToVisiblePages(false, true);
+            }
+        }
         if (fromUser && !filmstripMode && scale <= enter) {
+            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_COMMIT, Math.min(scale, 1f));
             enterFilmstripMode();
-        } else if (filmstripMode && scale >= exit) {
+            syncFilmstripScaleToVisiblePages(false, true);
+        } else if (fromUser && filmstripMode && scale >= exit) {
             exitFilmstripMode();
+            syncFilmstripScaleToVisiblePages(true, true);
         }
     }
 
@@ -324,6 +338,30 @@ public class AlbumViewerActivity extends AppCompatActivity {
             page.setTranslationX(-pageMarginPx * clampedPos);
         });
         pager.setOffscreenPageLimit(enable ? 3 : 1);
+    }
+
+    private void syncFilmstripScaleToVisiblePages(boolean resetToFit, boolean includeCurrent) {
+        if (pager == null) return;
+        View child = pager.getChildAt(0);
+        if (!(child instanceof RecyclerView)) return;
+        RecyclerView rv = (RecyclerView) child;
+        int current = pager.getCurrentItem();
+        for (int i = 0; i < rv.getChildCount(); i++) {
+            View page = rv.getChildAt(i);
+            RecyclerView.ViewHolder vh = rv.getChildViewHolder(page);
+            int pos = vh == null ? RecyclerView.NO_POSITION : vh.getBindingAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) continue;
+            if (!includeCurrent && pos == current) continue;
+            ZoomableImageView iv = page.findViewById(R.id.albumViewerImageView);
+            if (iv == null) continue;
+            if (resetToFit) {
+                iv.clearDesiredScale();
+                iv.setDesiredScale(1f, false);
+            } else {
+                float target = Math.min(filmstripScale, 1f);
+                iv.setDesiredScale(target, false);
+            }
+        }
     }
 
     private float dpToPx(float dp) {
@@ -995,15 +1033,18 @@ public class AlbumViewerActivity extends AppCompatActivity {
         private final Runnable onToggleChrome;
         private final Runnable onHideChrome;
         private final TriConsumer<Integer, Float, Boolean> onScaleChange;
+        private final java.util.function.IntToDoubleFunction initialScaleProvider;
 
         AlbumPagerAdapter(@NonNull List<PhotoEntry> items,
                           Runnable onToggleChrome,
                           Runnable onHideChrome,
-                          TriConsumer<Integer, Float, Boolean> onScaleChange) {
+                          TriConsumer<Integer, Float, Boolean> onScaleChange,
+                          java.util.function.IntToDoubleFunction initialScaleProvider) {
             this.items = items == null ? new ArrayList<>() : items;
             this.onToggleChrome = onToggleChrome;
             this.onHideChrome = onHideChrome;
             this.onScaleChange = onScaleChange;
+            this.initialScaleProvider = initialScaleProvider;
         }
 
         @NonNull
@@ -1035,16 +1076,25 @@ public class AlbumViewerActivity extends AppCompatActivity {
             void bind(PhotoEntry entry) {
                 if (entry == null) return;
                 if (imageView != null) {
-                    imageView.resetZoom();
+                    float initScale = 1f;
+                    int pos = getBindingAdapterPosition();
+                    if (initialScaleProvider != null && pos != RecyclerView.NO_POSITION) {
+                        initScale = (float) initialScaleProvider.applyAsDouble(pos);
+                    }
+                    if (initScale >= 0.999f) {
+                        imageView.clearDesiredScale();
+                    } else {
+                        imageView.setDesiredScale(initScale, false);
+                    }
                     imageView.setOnClickListener(v -> handleClick());
                     imageView.setOnTransformListener(() -> {
                         if (onHideChrome != null) onHideChrome.run();
                     });
                     imageView.setOnScaleChangeListener((scale, fromUser) -> {
                         if (onScaleChange != null) {
-                            int pos = getBindingAdapterPosition();
-                            if (pos != RecyclerView.NO_POSITION) {
-                                onScaleChange.accept(pos, scale, fromUser);
+                            int scalePos = getBindingAdapterPosition();
+                            if (scalePos != RecyclerView.NO_POSITION) {
+                                onScaleChange.accept(scalePos, scale, fromUser);
                             }
                         }
                     });
