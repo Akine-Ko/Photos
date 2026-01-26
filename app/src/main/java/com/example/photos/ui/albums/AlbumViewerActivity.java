@@ -95,6 +95,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
     private float filmstripScale = 1f;
+    private MultiPageSnapHelper multiPageSnapHelper;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
     private PhotoEntry pendingDeleteEntry;
@@ -191,6 +192,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 position -> filmstripMode ? filmstripScale : 1f);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
+        installMultiPageSnapHelper();
         pager.setOnTouchListener((v, ev) -> {
             if (!filmstripMode) return false;
 
@@ -309,6 +311,20 @@ public class AlbumViewerActivity extends AppCompatActivity {
             progress = Math.min(1f, Math.max(0f, (start - scale) / (start - end)));
         }
         applyFilmstripPreview(progress);
+    }
+
+    private void installMultiPageSnapHelper() {
+        if (multiPageSnapHelper != null) return;
+        multiPageSnapHelper = new MultiPageSnapHelper(() -> filmstripMode);
+        pager.post(() -> {
+            View child = pager.getChildAt(0);
+            if (!(child instanceof RecyclerView)) return;
+            RecyclerView rv = (RecyclerView) child;
+            if (rv.getOnFlingListener() != null) {
+                rv.setOnFlingListener(null);
+            }
+            multiPageSnapHelper.attachToRecyclerView(rv);
+        });
     }
 
     @Nullable
