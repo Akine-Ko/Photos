@@ -216,7 +216,10 @@ public class AlbumViewerActivity extends AppCompatActivity {
         thumbAdapter = new ThumbnailAdapter(entries, this::scrollToPosition);
         thumbRecyclerView.setAdapter(thumbAdapter);
         updateThumbSelection();
-        pager.setOnClickListener(v -> toggleChrome());
+        pager.setOnClickListener(v -> {
+            if (filmstripMode || filmstripPreviewProgress > 0f) return;
+            toggleChrome();
+        });
 
         // Predictive back support: route system back gesture to our finish logic.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -350,30 +353,46 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private void applyFilmstripPreview(float progress) {
         if (pager == null) return;
         capturePagerPaddingIfNeeded();
+
         float clamped = Math.min(1f, Math.max(0f, progress));
         filmstripPreviewProgress = clamped;
-        float sidePx = dpToPx(48f) * clamped;
+
+        // Pull pages closer: thinner gutters.
+        float sidePx = dpToPx(24f) * clamped;
+
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
         pager.setClipChildren(!enable);
+
         ViewGroup rv = (ViewGroup) pager.getChildAt(0);
         if (rv != null) {
             rv.setClipToPadding(!enable);
             rv.setClipChildren(!enable);
         }
-        pager.setPadding((int) (pagerPadStart + sidePx), pagerPadTop,
-                (int) (pagerPadEnd + sidePx), pagerPadBottom);
-        final float pageMarginPx = dpToPx(16f) * clamped;
-        final float scaleDown = 0.9f;
+
+        pager.setPadding(
+                (int) (pagerPadStart + sidePx),
+                pagerPadTop,
+                (int) (pagerPadEnd + sidePx),
+                pagerPadBottom
+        );
+
+        final float squeezePx = dpToPx(32f) * clamped;
+        final float scaleDown = 0.97f;
+
         pager.setPageTransformer((page, position) -> {
             float clampedPos = Math.max(-1f, Math.min(1f, position));
-            float posScale = 1f - 0.12f * clamped * Math.abs(clampedPos);
+
+            float posScale = 1f - 0.04f * clamped * Math.abs(clampedPos);
             float base = 1f - (1f - scaleDown) * clamped;
             float scaleVal = Math.max(base, posScale);
+
             page.setScaleY(scaleVal);
             page.setScaleX(scaleVal);
-            page.setTranslationX(-pageMarginPx * clampedPos);
+
+            page.setTranslationX(-squeezePx * clampedPos);
         });
+
         pager.setOffscreenPageLimit(enable ? 3 : 1);
     }
 
