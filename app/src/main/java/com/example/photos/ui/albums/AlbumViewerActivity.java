@@ -18,6 +18,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.EditText;
@@ -97,6 +98,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
     private float filmstripScale = 1f;
+    private int touchSlop;
+    private float tapDownX;
+    private float tapDownY;
+    private long tapDownTime;
+    private boolean tapCandidate;
     private MultiPageSnapHelper multiPageSnapHelper;
     private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
     private ActivityResultLauncher<Intent> manageMediaPermissionLauncher;
@@ -128,6 +134,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         ImageButton infoButton = findViewById(R.id.albumViewerInfoButton);
         RecyclerView thumbRecyclerView = findViewById(R.id.albumViewerThumbRecyclerView);
         View root = findViewById(R.id.albumViewerRoot);
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         // Ensure status/navigation icons use dark mode on light background initially
         updateSystemBars(true, root);
         applyWindowInsets(root);
@@ -198,13 +205,46 @@ public class AlbumViewerActivity extends AppCompatActivity {
         pager.setOffscreenPageLimit(1);
         installMultiPageSnapHelper();
         pager.setOnTouchListener((v, ev) -> {
-            if (!filmstripMode) return false;
-
             ZoomableImageView current = findCurrentZoomView();
-            if (current == null) return false;
 
-            boolean consume = current.onExternalTouchEvent(ev);
-            return consume;
+            // Forward multi-touch (pinch) to the current image view.
+            boolean consumePinch = false;
+            if (current != null) {
+                consumePinch = current.onExternalTouchEvent(ev);
+            }
+
+            boolean filmstripActive = filmstripMode || filmstripPreviewProgress > 0f;
+            if (filmstripActive && ev.getPointerCount() == 1) {
+                switch (ev.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        tapDownX = ev.getX();
+                        tapDownY = ev.getY();
+                        tapDownTime = ev.getEventTime();
+                        tapCandidate = true;
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        if (tapCandidate) {
+                            float dx = Math.abs(ev.getX() - tapDownX);
+                            float dy = Math.abs(ev.getY() - tapDownY);
+                            if (dx > touchSlop || dy > touchSlop) {
+                                tapCandidate = false;
+                            }
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        if (tapCandidate && (ev.getEventTime() - tapDownTime) < 220) {
+                            handleFilmstripTap(ev.getX());
+                        }
+                        tapCandidate = false;
+                        break;
+                    case MotionEvent.ACTION_CANCEL:
+                        tapCandidate = false;
+                        break;
+                }
+            }
+
+            // Only consume when scaling; single-finger gestures keep ViewPager2 behavior.
+            return consumePinch;
         });
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
@@ -362,7 +402,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         filmstripPreviewProgress = clamped;
 
         // Pull pages closer: thinner gutters.
-        float sidePx = dpToPx(24f) * clamped;
+        float sidePx = dpToPx(16f) * clamped;
 
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
@@ -381,13 +421,13 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        final float squeezePx = dpToPx(32f) * clamped;
-        final float scaleDown = 0.97f;
+        final float squeezePx = dpToPx(26f) * clamped;
+        final float scaleDown = 0.985f;
 
         pager.setPageTransformer((page, position) -> {
             float clampedPos = Math.max(-1f, Math.min(1f, position));
 
-            float posScale = 1f - 0.04f * clamped * Math.abs(clampedPos);
+            float posScale = 1f - 0.03f * clamped * Math.abs(clampedPos);
             float base = 1f - (1f - scaleDown) * clamped;
             float scaleVal = Math.max(base, posScale);
 
@@ -398,6 +438,25 @@ public class AlbumViewerActivity extends AppCompatActivity {
         });
 
         pager.setOffscreenPageLimit(enable ? 3 : 1);
+    }
+
+    private void handleFilmstripTap(float x) {
+        if (pager == null || adapter == null) return;
+
+        int cur = pager.getCurrentItem();
+        int count = adapter.getItemCount();
+        if (count <= 1) return;
+
+        float w = pager.getWidth();
+
+        float edge = Math.max(pager.getPaddingLeft(), pager.getPaddingRight());
+        float zone = Math.max(edge + dpToPx(24f), w * 0.32f);
+
+        if (x < zone) {
+            if (cur > 0) pager.setCurrentItem(cur - 1, true);
+        } else if (x > (w - zone)) {
+            if (cur < count - 1) pager.setCurrentItem(cur + 1, true);
+        }
     }
 
     private void syncFilmstripScaleToVisiblePages(boolean resetToFit, boolean includeCurrent) {
