@@ -402,7 +402,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
         filmstripPreviewProgress = clamped;
 
         // Pull pages closer: thinner gutters.
-        float sidePx = dpToPx(16f) * clamped;
+        // 保持很窄的边缘可见，但不至于完全被挤掉
+        float sidePx = dpToPx(10f) * clamped;
 
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
@@ -421,7 +422,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        final float squeezePx = dpToPx(26f) * clamped;
+        // 适当减少横向挤压，避免左右页盖住中间页
+        final float squeezePx = dpToPx(18f) * clamped;
         final float scaleDown = 0.985f;
 
         pager.setPageTransformer((page, position) -> {
