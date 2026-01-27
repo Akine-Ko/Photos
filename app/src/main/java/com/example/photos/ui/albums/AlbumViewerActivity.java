@@ -56,6 +56,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 import java.io.File;
 import java.io.InputStream;
 
@@ -188,8 +190,10 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 entries.add(new PhotoEntry(id, url, date));
             }
         }
-        adapter = new AlbumPagerAdapter(entries, this::toggleChrome, this::hideChrome, this::onScaleChanged,
-                position -> filmstripMode ? filmstripScale : 1f);
+        adapter = new AlbumPagerAdapter(entries, pager, this::toggleChrome, this::hideChrome, this::onScaleChanged,
+                position -> filmstripMode ? filmstripScale : 1f,
+                () -> filmstripMode,
+                () -> (double) filmstripPreviewProgress);
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(1);
         installMultiPageSnapHelper();
@@ -1086,21 +1090,30 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private static class AlbumPagerAdapter extends RecyclerView.Adapter<AlbumPagerAdapter.ViewHolder> {
 
         private final List<PhotoEntry> items;
+        private final ViewPager2 pager;
         private final Runnable onToggleChrome;
         private final Runnable onHideChrome;
         private final TriConsumer<Integer, Float, Boolean> onScaleChange;
         private final java.util.function.IntToDoubleFunction initialScaleProvider;
+        private final java.util.function.BooleanSupplier filmstripModeSupplier;
+        private final java.util.function.DoubleSupplier previewProgressSupplier;
 
         AlbumPagerAdapter(@NonNull List<PhotoEntry> items,
+                          ViewPager2 pager,
                           Runnable onToggleChrome,
                           Runnable onHideChrome,
                           TriConsumer<Integer, Float, Boolean> onScaleChange,
-                          java.util.function.IntToDoubleFunction initialScaleProvider) {
+                          java.util.function.IntToDoubleFunction initialScaleProvider,
+                          java.util.function.BooleanSupplier filmstripModeSupplier,
+                          java.util.function.DoubleSupplier previewProgressSupplier) {
             this.items = items == null ? new ArrayList<>() : items;
+            this.pager = pager;
             this.onToggleChrome = onToggleChrome;
             this.onHideChrome = onHideChrome;
             this.onScaleChange = onScaleChange;
             this.initialScaleProvider = initialScaleProvider;
+            this.filmstripModeSupplier = filmstripModeSupplier;
+            this.previewProgressSupplier = previewProgressSupplier;
         }
 
         @NonNull
@@ -1165,6 +1178,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
             }
 
             private void handleClick() {
+                int pos = getBindingAdapterPosition();
+                // Filmstrip/transition: don't reset or toggle chrome; optionally jump to tapped page.
+                if (filmstripModeSupplier.getAsBoolean() || previewProgressSupplier.getAsDouble() > 0d) {
+                    if (pos != RecyclerView.NO_POSITION && pager != null && pos != pager.getCurrentItem()) {
+                        pager.setCurrentItem(pos, true);
+                    }
+                    return;
+                }
+
                 if (imageView != null && imageView.resetIfShrunk()) {
                     return;
                 }
