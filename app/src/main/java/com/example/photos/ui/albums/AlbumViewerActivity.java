@@ -69,6 +69,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
     public static final String EXTRA_START_INDEX = "extra_start_index";
     public static final String EXTRA_DELETED_IDS = "extra_deleted_ids";
     public static final String EXTRA_DATES = "extra_dates";
+    private static final float FILMSTRIP_PREVIEW_END = 0.92f;
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -352,7 +353,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
     private void applyFilmstripPreviewProgress(float scale) {
         float start = 1f;
-        float end = ZoomableImageView.FILMSTRIP_COMMIT;
+        float end = FILMSTRIP_PREVIEW_END;
         float progress = 0f;
         if (scale < start && start != end) {
             progress = Math.min(1f, Math.max(0f, (start - scale) / (start - end)));
@@ -401,9 +402,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
         float clamped = Math.min(1f, Math.max(0f, progress));
         filmstripPreviewProgress = clamped;
 
-        // Pull pages closer: thinner gutters.
-        // 保持很窄的边缘可见，但不至于完全被挤掉
-        float sidePx = dpToPx(10f) * clamped;
+        // Pull pages closer: thinner gutters while keeping neighbor pages visible.
+        float sidePx = dpToPx(16f) * clamped;
 
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
@@ -422,9 +422,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        // 适当减少横向挤压，避免左右页盖住中间页
-        final float squeezePx = dpToPx(18f) * clamped;
-        final float scaleDown = 0.985f;
+        // Push neighbors inward so their edges stay visible.
+        final float squeezePx = dpToPx(36f) * clamped;
+        final float scaleDown = 0.965f;
 
         pager.setPageTransformer((page, position) -> {
             float clampedPos = Math.max(-1f, Math.min(1f, position));
