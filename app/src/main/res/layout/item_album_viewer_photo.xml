@@ -8,6 +8,7 @@
         android:id="@+id/albumViewerImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@android:color/black"
         android:adjustViewBounds="true"
         android:scaleType="matrix"
         android:contentDescription="@string/home_photo_content_description" />

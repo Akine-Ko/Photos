@@ -403,7 +403,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         filmstripPreviewProgress = clamped;
 
         // Pull pages closer: thinner gutters while keeping neighbor pages visible.
-        float sidePx = dpToPx(16f) * clamped;
+        float sidePx = dpToPx(22f) * clamped;
 
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
@@ -422,21 +422,24 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        // Push neighbors inward so their edges stay visible.
-        final float squeezePx = dpToPx(36f) * clamped;
-        final float scaleDown = 0.965f;
+        final float pageGapPx = dpToPx(6f) * clamped; // small gap without overlapping pages
 
         pager.setPageTransformer((page, position) -> {
-            float clampedPos = Math.max(-1f, Math.min(1f, position));
+            float p = Math.max(-1f, Math.min(1f, position));
 
-            float posScale = 1f - 0.03f * clamped * Math.abs(clampedPos);
-            float base = 1f - (1f - scaleDown) * clamped;
-            float scaleVal = Math.max(base, posScale);
+            // Slightly shrink side pages for iOS-like filmstrip feel.
+            float scale = 1f - 0.06f * clamped * Math.abs(p);
+            page.setScaleX(scale);
+            page.setScaleY(scale);
 
-            page.setScaleY(scaleVal);
-            page.setScaleX(scaleVal);
+            // Shift pages without overlap to keep edges visible.
+            page.setTranslationX(p * pageGapPx);
 
-            page.setTranslationX(-squeezePx * clampedPos);
+            // Optional: fade side pages a bit; remove if undesired.
+            page.setAlpha(1f - 0.12f * clamped * Math.abs(p));
+
+            // Bring center page to front.
+            ViewCompat.setTranslationZ(page, (1f - Math.abs(p)) * clamped);
         });
 
         pager.setOffscreenPageLimit(enable ? 3 : 1);
