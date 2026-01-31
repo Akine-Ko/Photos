@@ -69,7 +69,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
     public static final String EXTRA_START_INDEX = "extra_start_index";
     public static final String EXTRA_DELETED_IDS = "extra_deleted_ids";
     public static final String EXTRA_DATES = "extra_dates";
-    private static final float FILMSTRIP_PREVIEW_END = 0.92f;
+    private static final float FILMSTRIP_PREVIEW_END = ZoomableImageView.FILMSTRIP_STICKY;
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -323,13 +323,13 @@ public class AlbumViewerActivity extends AppCompatActivity {
         final float exit = ZoomableImageView.FILMSTRIP_EXIT;
         applyFilmstripPreviewProgress(scale);
         if (fromUser && scale < 1f) {
-            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_COMMIT, Math.min(scale, 1f));
+            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_STICKY, Math.min(scale, 1f));
             if (filmstripMode) {
                 syncFilmstripScaleToVisiblePages(false, true);
             }
         }
         if (fromUser && !filmstripMode && scale <= enter) {
-            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_COMMIT, Math.min(scale, 1f));
+            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_STICKY, Math.min(scale, 1f));
             enterFilmstripMode();
             syncFilmstripScaleToVisiblePages(false, true);
         } else if (fromUser && filmstripMode && scale >= exit) {
@@ -403,7 +403,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         filmstripPreviewProgress = clamped;
 
         // Pull pages closer: thinner gutters while keeping neighbor pages visible.
-        float sidePx = dpToPx(22f) * clamped;
+        float sidePx = dpToPx(100f) * clamped;
 
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
