@@ -402,9 +402,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
         float clamped = Math.min(1f, Math.max(0f, progress));
         filmstripPreviewProgress = clamped;
 
-        // Pull pages closer: thinner gutters while keeping neighbor pages visible.
-        float sidePx = dpToPx(100f) * clamped;
-
         boolean enable = clamped > 0f;
         pager.setClipToPadding(!enable);
         pager.setClipChildren(!enable);
@@ -415,6 +412,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
             rv.setClipChildren(!enable);
         }
 
+        // Window that reveals side pages; bigger = more peek, smaller = tighter center.
+        float sidePx = dpToPx(24f) * clamped; // Tweak within ~18–32 for taste.
+
         pager.setPadding(
                 (int) (pagerPadStart + sidePx),
                 pagerPadTop,
@@ -422,23 +422,24 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        final float pageGapPx = dpToPx(6f) * clamped; // small gap without overlapping pages
+        // Nudge side pages inward for a tighter feel (too large may overlap).
+        final float pullInPx = dpToPx(14f) * clamped;
 
         pager.setPageTransformer((page, position) -> {
             float p = Math.max(-1f, Math.min(1f, position));
 
-            // Slightly shrink side pages for iOS-like filmstrip feel.
-            float scale = 1f - 0.06f * clamped * Math.abs(p);
+            // Gentle side-page scale to avoid a loose feel.
+            float scale = 1f - 0.035f * clamped * Math.abs(p);
             page.setScaleX(scale);
             page.setScaleY(scale);
 
-            // Shift pages without overlap to keep edges visible.
-            page.setTranslationX(p * pageGapPx);
+            // Pull pages inward instead of pushing them apart.
+            page.setTranslationX(-p * pullInPx);
 
-            // Optional: fade side pages a bit; remove if undesired.
-            page.setAlpha(1f - 0.12f * clamped * Math.abs(p));
+            // Keep opacity to avoid a hollow look.
+            page.setAlpha(1f);
 
-            // Bring center page to front.
+            // Lift center page slightly for iOS-like focus.
             ViewCompat.setTranslationZ(page, (1f - Math.abs(p)) * clamped);
         });
 
