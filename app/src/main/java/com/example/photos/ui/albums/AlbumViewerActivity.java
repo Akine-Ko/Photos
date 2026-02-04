@@ -433,27 +433,50 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
         final float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clamped;
         final float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clamped;
+        final float squeezePx = (pullInPx + pageGapPx); // keep seam tight while respecting gap
 
         pager.setPageTransformer((page, position) -> {
             float p = Math.max(-1f, Math.min(1f, position));
+            float abs = Math.abs(p);
 
-            // IMPORTANT: don't scale the page view itself.
-            // View scaling doesn't change hit-testing bounds (tap area stays large), which makes
-            // "black seam" taps / neighbor taps feel wrong. We scale the *image content* using
-            // ZoomableImageView.setDesiredScale(...) instead.
-            page.setScaleX(1f);
-            page.setScaleY(1f);
+            // Gentle scale but lock pivot to the inner edge so the exposed strip is the true edge.
+            final float scaleDown = 0.985f;
+            float posScale = 1f - 0.03f * clamped * abs;
+            float base = 1f - (1f - scaleDown) * clamped;
+            float scaleVal = Math.max(base, posScale);
 
-            // Make the seam thinner:
-            // - "pull in" pages a bit toward center (negative sign)
-            // - keep a tiny configurable gap so pages don't overlap visually
-            page.setTranslationX((-p * pullInPx) + (-p * pageGapPx));
+            page.setPivotY(page.getHeight() * 0.5f);
+            if (p > 0.001f) {
+                // right page: lock left edge
+                page.setPivotX(0f);
+            } else if (p < -0.001f) {
+                // left page: lock right edge
+                page.setPivotX(page.getWidth());
+            } else {
+                page.setPivotX(page.getWidth() * 0.5f);
+            }
+            page.setScaleX(scaleVal);
+            page.setScaleY(scaleVal);
+
+            ZoomableImageView zv = page.findViewById(R.id.albumViewerImageView);
+            if (zv != null) {
+                float biasX = 0f;
+                if (p > 0.02f) {
+                    biasX = -1f; // right page: stick left edge
+                } else if (p < -0.02f) {
+                    biasX = 1f;  // left page: stick right edge
+                }
+                zv.setFilmstripEdgeBiasX(biasX);
+            }
+
+            // Pull pages inward while keeping a tiny configurable gap.
+            page.setTranslationX(-squeezePx * p);
 
             // Fade side pages a bit.
-            page.setAlpha(1f - 0.08f * clamped * Math.abs(p));
+            page.setAlpha(1f - 0.08f * clamped * abs);
 
             // Bring center page to front.
-            ViewCompat.setTranslationZ(page, (1f - Math.abs(p)) * clamped);
+            ViewCompat.setTranslationZ(page, (1f - abs) * clamped);
         });
 
         pager.setOffscreenPageLimit(enable ? 3 : 1);
