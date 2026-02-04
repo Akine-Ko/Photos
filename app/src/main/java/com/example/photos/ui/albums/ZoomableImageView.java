@@ -30,10 +30,17 @@ public class ZoomableImageView extends AppCompatImageView {
     private final RectF contentRect = new RectF();
     private static final float PAN_THRESHOLD = 1.05f; // allow ViewPager when near base scale
     // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
-    public static final float FILMSTRIP_ENTER = 0.98f;  // start revealing neighbors
-    public static final float FILMSTRIP_EXIT = 0.995f;  // exit filmstrip when zoomed back (must be > enter)
-    public static final float FILMSTRIP_COMMIT = 0.82f; // must shrink past this to avoid snap-back (legacy lower bound)
-    public static final float FILMSTRIP_STICKY = 0.94f; // shrink to here and stay in filmstrip without bouncing to 1x
+    public static final float FILMSTRIP_ENTER = 0.95f;  // start revealing neighbors (pinch down)
+    public static final float FILMSTRIP_EXIT = 0.985f;  // exit filmstrip when zoomed back (must be > enter)
+
+    /**
+     * Filmstrip target scale.
+     *
+     * - This is also the minimum scale while in the viewer.
+     * - When you lift your finger, we only "stick" if you reached this scale.
+     */
+    public static final float FILMSTRIP_COMMIT = 0.87f;
+    public static final float FILMSTRIP_STICKY = FILMSTRIP_COMMIT;
     private static final float EDGE_HANDOFF_TOLERANCE = 24f; // px slack before giving pan to pager
 
     private final ScaleGestureDetector scaleDetector;
@@ -213,7 +220,9 @@ public class ZoomableImageView extends AppCompatImageView {
         float dy = (viewHeight - dh * scale) * 0.5f;
         baseMatrix.postScale(scale, scale);
         baseMatrix.postTranslate(dx, dy);
-        minScale = FILMSTRIP_STICKY;
+        // In album viewer we allow shrinking into "filmstrip" mode.
+        // Keep the minimum at FILMSTRIP_COMMIT so the user can pinch down to ~0.87.
+        minScale = FILMSTRIP_COMMIT;
         checkBounds(); // keep existing user matrix sane under new size
         applyMatrix();
         applyDesiredScaleIfNeeded();
@@ -468,18 +477,20 @@ public class ZoomableImageView extends AppCompatImageView {
         float scale = getCurrentScale();
         // If near 1x, leave it.
         if (scale >= 1f - 0.001f) return;
-        // At or below minScale (commit), leave it.
-        if (scale <= minScale + 0.001f) return;
+        // At or below minScale (commit), stick there.
+        if (scale <= minScale + 0.001f) {
+            if (Math.abs(scale - minScale) > 0.0005f) {
+                animateToScale(minScale, true);
+            }
+            return;
+        }
 
         clearDesiredScale();
 
-        if (scale <= FILMSTRIP_STICKY + 0.001f) {
-            // Stick at filmstrip threshold instead of bouncing back to full.
-            animateToScale(FILMSTRIP_STICKY, true);
-        } else {
-            // Not shrunk enough: return to full size.
-            animateToScale(1f, true);
-        }
+        // Only 2 snap targets:
+        // - If you reached filmstrip (<= commit): we already returned above.
+        // - Otherwise: bounce back to full size.
+        animateToScale(1f, true);
     }
 
     public boolean isScalingInProgress() {

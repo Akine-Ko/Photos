@@ -69,7 +69,16 @@ public class AlbumViewerActivity extends AppCompatActivity {
     public static final String EXTRA_START_INDEX = "extra_start_index";
     public static final String EXTRA_DELETED_IDS = "extra_deleted_ids";
     public static final String EXTRA_DATES = "extra_dates";
-    private static final float FILMSTRIP_PREVIEW_END = ZoomableImageView.FILMSTRIP_STICKY;
+    // Filmstrip reveal finishes when you hit the filmstrip target scale.
+    private static final float FILMSTRIP_PREVIEW_END = ZoomableImageView.FILMSTRIP_COMMIT;
+
+    // --- Filmstrip tuning knobs (dp) ---
+    // How much neighbor page to reveal on each side at full filmstrip (progress=1).
+    private static final float FILMSTRIP_SIDE_PADDING_DP = 72f;
+    // Visual gap between pages at full filmstrip (keep small; we also "pull in" using translation).
+    private static final float FILMSTRIP_PAGE_GAP_DP = 2f;
+    // How much to pull side pages inward so the seam is thinner (higher = tighter).
+    private static final float FILMSTRIP_PULL_IN_DP = 40f;
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -412,8 +421,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
             rv.setClipChildren(!enable);
         }
 
-        // Window that reveals side pages; bigger = more peek, smaller = tighter center.
-        float sidePx = dpToPx(24f) * clamped; // Tweak within ~18–32 for taste.
+        // Reveal neighbor pages while keeping the seam small.
+        float sidePx = dpToPx(FILMSTRIP_SIDE_PADDING_DP) * clamped;
 
         pager.setPadding(
                 (int) (pagerPadStart + sidePx),
@@ -422,24 +431,28 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        // Nudge side pages inward for a tighter feel (too large may overlap).
-        final float pullInPx = dpToPx(14f) * clamped;
+        final float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clamped;
+        final float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clamped;
 
         pager.setPageTransformer((page, position) -> {
             float p = Math.max(-1f, Math.min(1f, position));
 
-            // Gentle side-page scale to avoid a loose feel.
-            float scale = 1f - 0.035f * clamped * Math.abs(p);
-            page.setScaleX(scale);
-            page.setScaleY(scale);
+            // IMPORTANT: don't scale the page view itself.
+            // View scaling doesn't change hit-testing bounds (tap area stays large), which makes
+            // "black seam" taps / neighbor taps feel wrong. We scale the *image content* using
+            // ZoomableImageView.setDesiredScale(...) instead.
+            page.setScaleX(1f);
+            page.setScaleY(1f);
 
-            // Pull pages inward instead of pushing them apart.
-            page.setTranslationX(-p * pullInPx);
+            // Make the seam thinner:
+            // - "pull in" pages a bit toward center (negative sign)
+            // - keep a tiny configurable gap so pages don't overlap visually
+            page.setTranslationX((-p * pullInPx) + (-p * pageGapPx));
 
-            // Keep opacity to avoid a hollow look.
-            page.setAlpha(1f);
+            // Fade side pages a bit.
+            page.setAlpha(1f - 0.08f * clamped * Math.abs(p));
 
-            // Lift center page slightly for iOS-like focus.
+            // Bring center page to front.
             ViewCompat.setTranslationZ(page, (1f - Math.abs(p)) * clamped);
         });
 
@@ -455,12 +468,17 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
         float w = pager.getWidth();
 
-        float edge = Math.max(pager.getPaddingLeft(), pager.getPaddingRight());
-        float zone = Math.max(edge + dpToPx(24f), w * 0.32f);
+        // Only treat taps very near the visible edges as "prev/next".
+        // Use current pager padding so the zone follows your filmstrip settings.
+        float leftPad = pager.getPaddingLeft();
+        float rightPad = pager.getPaddingRight();
+        float margin = dpToPx(18f);
+        float leftZoneEnd = leftPad + margin;
+        float rightZoneStart = w - rightPad - margin;
 
-        if (x < zone) {
+        if (x < leftZoneEnd) {
             if (cur > 0) pager.setCurrentItem(cur - 1, true);
-        } else if (x > (w - zone)) {
+        } else if (x > rightZoneStart) {
             if (cur < count - 1) pager.setCurrentItem(cur + 1, true);
         }
     }
