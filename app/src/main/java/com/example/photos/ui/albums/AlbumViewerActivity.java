@@ -477,51 +477,48 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 return;
             }
 
-            // --- spacing / pull-in ---
-            float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clampedProgress;
+            // --- spacing / translation based on current scale inset ---
             float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clampedProgress;
-            float squeezePx = pullInPx + pageGapPx;
+            float pageW = page.getWidth();
+            float pageH = page.getHeight();
 
-            // Use RAW position here to avoid stacking (position=1,2,3 must NOT share the same transform)
-            page.setTranslationX(-squeezePx * raw);
-
-            // --- page scale + locked pivot (keep visual style) ---
+            // --- page scale + locked pivot ---
             float scaleDown = 0.985f; // small mode page scale
-            float baseScale = 1f + (scaleDown - 1f) * clampedProgress;
-            float posScale = baseScale - 0.03f * absClamped * clampedProgress;
-            float scaleVal = Math.max(baseScale, posScale);
+            float targetViewerScale = 1f + (scaleDown - 1f) * clampedProgress;
+            float absPos = Math.min(1f, Math.abs(position));
+            float scaleVal = targetViewerScale + (1f - targetViewerScale) * (1f - absPos);
+            scaleVal = Math.max(targetViewerScale, Math.min(1f, scaleVal));
 
-            if (raw > 0.02f) {
-                page.setPivotX(0f); // right page: stick LEFT edge
-            } else if (raw < -0.02f) {
-                page.setPivotX(page.getWidth()); // left page: stick RIGHT edge
+            float sideInset = (pageW * (1f - scaleVal)) * 0.5f;
+            float tx = -position * (sideInset + pageGapPx);
+            page.setTranslationX(tx);
+
+            final float EDGE_DEADZONE = 0.10f;
+            float biasX = 0f;
+            if (position > EDGE_DEADZONE) {
+                page.setPivotX(0f);
+                biasX = +1f;
+            } else if (position < -EDGE_DEADZONE) {
+                page.setPivotX(pageW);
+                biasX = -1f;
             } else {
-                page.setPivotX(page.getWidth() * 0.5f);
+                page.setPivotX(pageW * 0.5f);
             }
-            page.setPivotY(page.getHeight() * 0.5f);
+            page.setPivotY(pageH * 0.5f);
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
 
             // --- alpha / depth ---
-            page.setAlpha(1f - 0.08f * clampedProgress * absClamped);
+            page.setAlpha(1f - 0.10f * absPos);
 
             float z = (1f - absClamped) * clampedProgress;
             ViewCompat.setTranslationZ(page, z);
 
             // --- edge-bias for the image content inside the page ---
             // bias = +1 => stick LEFT edge; bias = -1 => stick RIGHT edge.
-            float biasX = 0f;
-            if (abs > 0.0001f) {
-                biasX = raw > 0f ? +1f : -1f;
-            }
-            if (page instanceof ViewGroup) {
-                ViewGroup g = (ViewGroup) page;
-                for (int i = 0; i < g.getChildCount(); i++) {
-                    View v = g.getChildAt(i);
-                    if (v instanceof ZoomableImageView) {
-                        ((ZoomableImageView) v).setFilmstripEdgeBiasX(biasX);
-                    }
-                }
+            ZoomableImageView zv = page.findViewById(R.id.albumViewerImageView);
+            if (zv != null) {
+                zv.setFilmstripEdgeBiasX(biasX);
             }
         });
 
@@ -1307,6 +1304,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
                     } else {
                         imageView.setDesiredScale(initScale, false);
                     }
+                    imageView.setFilmstripEdgeBiasX(0f);
                     imageView.setOnClickListener(v -> handleClick());
                     imageView.setOnTransformListener(() -> {
                         if (onHideChrome != null) onHideChrome.run();
