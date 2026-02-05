@@ -268,7 +268,9 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     public void setFilmstripEdgeBiasX(float bias) {
-        filmstripEdgeBiasX = clamp(bias, -1f, 1f);
+        float b = clamp(bias, -1f, 1f);
+        if (Math.abs(filmstripEdgeBiasX - b) < 0.0001f) return; // avoid thrashing checkBounds
+        filmstripEdgeBiasX = b;
         checkBounds();
         applyMatrix();
     }
@@ -326,39 +328,56 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     private void checkBounds() {
+        if (getDrawable() == null) return;
+
         RectF rect = getDisplayRect();
         if (rect == null) return;
 
-        float deltaX = 0f, deltaY = 0f;
-        float viewWidth = getWidth();
-        float viewHeight = getHeight();
+        final float viewWidth = getWidth();
+        final float viewHeight = getHeight();
 
-        // --- X: allow smooth edge bias when content is narrower than the view ---
-        if (rect.width() <= viewWidth) {
-            float maxOffset = viewWidth - rect.width(); // >= 0
-            // bias = +1 => stick LEFT edge; 0 => center; -1 => stick RIGHT edge
-            float t = (1f - filmstripEdgeBiasX) * 0.5f; // map [-1,1] -> [1,0]
-            t = clamp(t, 0f, 1f);
-            float targetLeft = maxOffset * t;
-            deltaX = targetLeft - rect.left;
+        float deltaX = 0f;
+        float deltaY = 0f;
+
+        // ---------- X: support filmstripEdgeBiasX for both narrow and wide images ----------
+        float bias = filmstripEdgeBiasX;
+
+        if (Math.abs(bias) > 0.0001f) {
+            // bias: +1 -> stick left; 0 -> center; -1 -> stick right
+            float t = (1f - bias) * 0.5f; // +1=>0, 0=>0.5, -1=>1
+
+            if (rect.width() <= viewWidth) {
+                // Narrow image: left can be in [0, viewWidth - rectW]
+                float maxLeft = viewWidth - rect.width(); // >=0
+                float desiredLeft = maxLeft * t;          // 0..maxLeft
+                deltaX = desiredLeft - rect.left;
+            } else {
+                // Wide image: left can be in [viewWidth - rectW, 0] (all <=0)
+                float minLeft = viewWidth - rect.width(); // <=0
+                float desiredLeft = 0f + (minLeft - 0f) * t; // lerp(0 -> minLeft)
+                deltaX = desiredLeft - rect.left;
+            }
         } else {
-            if (rect.left > 0f) {
-                deltaX = -rect.left;
-            } else if (rect.right < viewWidth) {
-                deltaX = viewWidth - rect.right;
+            // Original default: center narrow images; clamp wide images to edges
+            if (rect.width() <= viewWidth) {
+                deltaX = (viewWidth - rect.width()) * 0.5f - rect.left;
+            } else {
+                if (rect.left > 0) deltaX = -rect.left;
+                else if (rect.right < viewWidth) deltaX = viewWidth - rect.right;
             }
         }
 
-        // --- Y: keep original centering/clamp logic ---
+        // ---------- Y: keep original centering/clamp ----------
         if (rect.height() <= viewHeight) {
-            deltaY = (viewHeight - rect.height()) / 2f - rect.top;
-        } else if (rect.top > 0f) {
-            deltaY = -rect.top;
-        } else if (rect.bottom < viewHeight) {
-            deltaY = viewHeight - rect.bottom;
+            deltaY = (viewHeight - rect.height()) * 0.5f - rect.top;
+        } else {
+            if (rect.top > 0) deltaY = -rect.top;
+            else if (rect.bottom < viewHeight) deltaY = viewHeight - rect.bottom;
         }
 
-        supportMatrix.postTranslate(deltaX, deltaY);
+        if (Math.abs(deltaX) > 0.001f || Math.abs(deltaY) > 0.001f) {
+            supportMatrix.postTranslate(deltaX, deltaY);
+        }
     }
 
     private void applyMatrix() {

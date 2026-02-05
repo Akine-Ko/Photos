@@ -506,13 +506,14 @@ public class AlbumViewerActivity extends AppCompatActivity {
             page.setAlpha(1f - 0.08f * clampedProgress * absClamped);
 
             float z = (1f - absClamped) * clampedProgress;
-            if (pagerScrollDir > 0 && raw > 0f) z += 0.001f;
-            else if (pagerScrollDir < 0 && raw < 0f) z += 0.001f;
             ViewCompat.setTranslationZ(page, z);
 
             // --- edge-bias for the image content inside the page ---
             // bias = +1 => stick LEFT edge; bias = -1 => stick RIGHT edge.
-            float biasX = Math.max(-1f, Math.min(1f, raw)); // smooth during swipe
+            float biasX = 0f;
+            if (abs > 0.0001f) {
+                biasX = raw > 0f ? +1f : -1f;
+            }
             if (page instanceof ViewGroup) {
                 ViewGroup g = (ViewGroup) page;
                 for (int i = 0; i < g.getChildCount(); i++) {
