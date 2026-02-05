@@ -108,6 +108,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
     private float filmstripScale = 1f;
+    // ViewPager2 scroll direction tracker for stable Z ordering (filmstrip overlap)
+    private float lastPagerScrollPos = 0f;
+    private int pagerScrollDir = 0; // -1 = to previous (left), +1 = to next (right)
     private int touchSlop;
     private float tapDownX;
     private float tapDownY;
@@ -257,6 +260,17 @@ public class AlbumViewerActivity extends AppCompatActivity {
             return consumePinch;
         });
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+                // Track scroll direction to break Z-order ties when pages overlap in filmstrip mode.
+                float cur = position + positionOffset;
+                float d = cur - lastPagerScrollPos;
+                if (Math.abs(d) > 1e-4f) {
+                    pagerScrollDir = d > 0f ? 1 : -1;
+                    lastPagerScrollPos = cur;
+                }
+            }
+
             @Override
             public void onPageSelected(int position) {
                 updateCounter();
@@ -431,52 +445,83 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 pagerPadBottom
         );
 
-        final float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clamped;
-        final float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clamped;
-        final float squeezePx = (pullInPx + pageGapPx); // keep seam tight while respecting gap
-
         pager.setPageTransformer((page, position) -> {
-            float p = Math.max(-1f, Math.min(1f, position));
-            float abs = Math.abs(p);
+            // IMPORTANT:
+            // - Use raw position for translation. Clamping stacks pages (position 1 & 2 overlap).
+            final float raw = position;
+            final float abs = Math.abs(raw);
+            final float absClamped = Math.min(1f, abs);
 
-            // Gentle scale but lock pivot to the inner edge so the exposed strip is the true edge.
-            final float scaleDown = 0.985f;
-            float posScale = 1f - 0.03f * clamped * abs;
-            float base = 1f - (1f - scaleDown) * clamped;
-            float scaleVal = Math.max(base, posScale);
+            // Filmstrip progress 0..1 (0 = normal, 1 = sticky filmstrip)
+            float progressNorm = (1f - filmstripScale) / (1f - ZoomableImageView.FILMSTRIP_STICKY);
+            float clampedProgress = Math.min(1f, Math.max(0f, progressNorm));
+            if (clampedProgress <= 0f) {
+                page.setAlpha(1f);
+                page.setScaleX(1f);
+                page.setScaleY(1f);
+                page.setPivotX(page.getWidth() * 0.5f);
+                page.setPivotY(page.getHeight() * 0.5f);
+                page.setTranslationX(0f);
+                ViewCompat.setTranslationZ(page, 0f);
 
-            page.setPivotY(page.getHeight() * 0.5f);
-            if (p > 0.001f) {
-                // right page: lock left edge
-                page.setPivotX(0f);
-            } else if (p < -0.001f) {
-                // left page: lock right edge
-                page.setPivotX(page.getWidth());
+                // Reset edge-bias when not in filmstrip.
+                if (page instanceof ViewGroup) {
+                    ViewGroup g = (ViewGroup) page;
+                    for (int i = 0; i < g.getChildCount(); i++) {
+                        View v = g.getChildAt(i);
+                        if (v instanceof ZoomableImageView) {
+                            ((ZoomableImageView) v).setFilmstripEdgeBiasX(0f);
+                        }
+                    }
+                }
+                return;
+            }
+
+            // --- spacing / pull-in ---
+            float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clampedProgress;
+            float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clampedProgress;
+            float squeezePx = pullInPx + pageGapPx;
+
+            // Use RAW position here to avoid stacking (position=1,2,3 must NOT share the same transform)
+            page.setTranslationX(-squeezePx * raw);
+
+            // --- page scale + locked pivot (keep visual style) ---
+            float scaleDown = 0.985f; // small mode page scale
+            float baseScale = 1f + (scaleDown - 1f) * clampedProgress;
+            float posScale = baseScale - 0.03f * absClamped * clampedProgress;
+            float scaleVal = Math.max(baseScale, posScale);
+
+            if (raw > 0.02f) {
+                page.setPivotX(0f); // right page: stick LEFT edge
+            } else if (raw < -0.02f) {
+                page.setPivotX(page.getWidth()); // left page: stick RIGHT edge
             } else {
                 page.setPivotX(page.getWidth() * 0.5f);
             }
+            page.setPivotY(page.getHeight() * 0.5f);
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
 
-            ZoomableImageView zv = page.findViewById(R.id.albumViewerImageView);
-            if (zv != null) {
-                float biasX = 0f;
-                if (p > 0.02f) {
-                    biasX = -1f; // right page: stick left edge
-                } else if (p < -0.02f) {
-                    biasX = 1f;  // left page: stick right edge
+            // --- alpha / depth ---
+            page.setAlpha(1f - 0.08f * clampedProgress * absClamped);
+
+            float z = (1f - absClamped) * clampedProgress;
+            if (pagerScrollDir > 0 && raw > 0f) z += 0.001f;
+            else if (pagerScrollDir < 0 && raw < 0f) z += 0.001f;
+            ViewCompat.setTranslationZ(page, z);
+
+            // --- edge-bias for the image content inside the page ---
+            // bias = +1 => stick LEFT edge; bias = -1 => stick RIGHT edge.
+            float biasX = Math.max(-1f, Math.min(1f, raw)); // smooth during swipe
+            if (page instanceof ViewGroup) {
+                ViewGroup g = (ViewGroup) page;
+                for (int i = 0; i < g.getChildCount(); i++) {
+                    View v = g.getChildAt(i);
+                    if (v instanceof ZoomableImageView) {
+                        ((ZoomableImageView) v).setFilmstripEdgeBiasX(biasX);
+                    }
                 }
-                zv.setFilmstripEdgeBiasX(biasX);
             }
-
-            // Pull pages inward while keeping a tiny configurable gap.
-            page.setTranslationX(-squeezePx * p);
-
-            // Fade side pages a bit.
-            page.setAlpha(1f - 0.08f * clamped * abs);
-
-            // Bring center page to front.
-            ViewCompat.setTranslationZ(page, (1f - abs) * clamped);
         });
 
         pager.setOffscreenPageLimit(enable ? 3 : 1);

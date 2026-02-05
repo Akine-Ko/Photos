@@ -268,7 +268,7 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     public void setFilmstripEdgeBiasX(float bias) {
-        filmstripEdgeBiasX = bias;
+        filmstripEdgeBiasX = clamp(bias, -1f, 1f);
         checkBounds();
         applyMatrix();
     }
@@ -333,23 +333,20 @@ public class ZoomableImageView extends AppCompatImageView {
         float viewWidth = getWidth();
         float viewHeight = getHeight();
 
-        // --- X: center by default; allow edge bias for filmstrip side pages ---
+        // --- X: allow smooth edge bias when content is narrower than the view ---
         if (rect.width() <= viewWidth) {
-            if (Math.abs(filmstripEdgeBiasX) > 1e-3f) {
-                if (filmstripEdgeBiasX < 0f) {
-                    // stick to left edge
-                    deltaX = -rect.left;
-                } else {
-                    // stick to right edge
-                    deltaX = viewWidth - rect.right;
-                }
-            } else {
-                deltaX = (viewWidth - rect.width()) / 2f - rect.left;
+            float maxOffset = viewWidth - rect.width(); // >= 0
+            // bias = +1 => stick LEFT edge; 0 => center; -1 => stick RIGHT edge
+            float t = (1f - filmstripEdgeBiasX) * 0.5f; // map [-1,1] -> [1,0]
+            t = clamp(t, 0f, 1f);
+            float targetLeft = maxOffset * t;
+            deltaX = targetLeft - rect.left;
+        } else {
+            if (rect.left > 0f) {
+                deltaX = -rect.left;
+            } else if (rect.right < viewWidth) {
+                deltaX = viewWidth - rect.right;
             }
-        } else if (rect.left > 0f) {
-            deltaX = -rect.left;
-        } else if (rect.right < viewWidth) {
-            deltaX = viewWidth - rect.right;
         }
 
         // --- Y: keep original centering/clamp logic ---
