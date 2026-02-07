@@ -268,11 +268,19 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     public void setFilmstripEdgeBiasX(float bias) {
-        float b = clamp(bias, -1f, 1f);
-        if (Math.abs(filmstripEdgeBiasX - b) < 0.0001f) return; // avoid thrashing checkBounds
-        filmstripEdgeBiasX = b;
-        checkBounds();
-        applyMatrix();
+        float clamped = clamp(bias, -1f, 1f);
+        if (Math.abs(filmstripEdgeBiasX - clamped) < 0.002f) return; // debounce tiny changes
+        filmstripEdgeBiasX = clamped;
+
+        if (!scalingInProgress) {
+            if (hasDesiredScale && Math.abs(getCurrentScale() - desiredScale) > 1e-3f) {
+                float target = clamp(desiredScale, minScale, maxScale);
+                setRelativeScaleImmediate(target);
+            } else {
+                checkBounds();
+                applyMatrix();
+            }
+        }
     }
 
     private void applyDesiredScaleIfNeeded() {
@@ -343,16 +351,26 @@ public class ZoomableImageView extends AppCompatImageView {
         float bias = filmstripEdgeBiasX;
 
         if (Math.abs(bias) > 0.0001f) {
-            // bias: +1 -> stick left; 0 -> center; -1 -> stick right
-            float t = (1f - bias) * 0.5f; // +1=>0, 0=>0.5, -1=>1
-
             if (rect.width() <= viewWidth) {
-                // Narrow image: left can be in [0, viewWidth - rectW]
-                float maxLeft = viewWidth - rect.width(); // >=0
-                float desiredLeft = maxLeft * t;          // 0..maxLeft
-                deltaX = desiredLeft - rect.left;
+                float centerTx = (viewWidth - rect.width()) * 0.5f;
+                float leftTx = 0f;
+                float rightTx = viewWidth - rect.width();
+
+                float b = clamp(bias, -1f, 1f);
+                float targetTx;
+                if (b > 0f) {
+                    // 0 -> center, +1 -> left
+                    targetTx = centerTx + (leftTx - centerTx) * b;
+                } else if (b < 0f) {
+                    // 0 -> center, -1 -> right
+                    targetTx = centerTx + (rightTx - centerTx) * (-b);
+                } else {
+                    targetTx = centerTx;
+                }
+                deltaX = targetTx - rect.left;
             } else {
                 // Wide image: left can be in [viewWidth - rectW, 0] (all <=0)
+                float t = (1f - bias) * 0.5f; // +1=>0, 0=>0.5, -1=>1
                 float minLeft = viewWidth - rect.width(); // <=0
                 float desiredLeft = 0f + (minLeft - 0f) * t; // lerp(0 -> minLeft)
                 deltaX = desiredLeft - rect.left;
