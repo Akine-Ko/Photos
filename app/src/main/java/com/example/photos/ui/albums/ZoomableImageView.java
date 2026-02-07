@@ -268,20 +268,13 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     public void setFilmstripEdgeBiasX(float bias) {
-        float clamped = clamp(bias, -1f, 1f);
-        if (Math.abs(filmstripEdgeBiasX - clamped) < 0.002f) return; // debounce tiny changes
-        filmstripEdgeBiasX = clamped;
-
-        if (!scalingInProgress) {
-            if (hasDesiredScale && Math.abs(getCurrentScale() - desiredScale) > 1e-3f) {
-                float target = clamp(desiredScale, minScale, maxScale);
-                setRelativeScaleImmediate(target);
-            } else {
-                checkBounds();
-                applyMatrix();
-            }
-        }
+        float b = clamp(bias, -1f, 1f);
+        if (Math.abs(filmstripEdgeBiasX - b) < 0.001f) return;
+        filmstripEdgeBiasX = b;
+        checkBounds();
+        applyMatrix();
     }
+
 
     private void applyDesiredScaleIfNeeded() {
         if (!hasDesiredScale) return;

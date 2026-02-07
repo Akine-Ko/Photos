@@ -20,14 +20,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
-import android.widget.EditText;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
+import android.widget.*;
 import android.graphics.Typeface;
-import android.widget.ImageView;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -79,6 +73,9 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private static final float FILMSTRIP_PAGE_GAP_DP = 2f;
     // How much to pull side pages inward so the seam is thinner (higher = tighter).
     private static final float FILMSTRIP_PULL_IN_DP = 40f;
+    private static final float FILMSTRIP_SCALE_DOWN = 0.985f;
+    private static final float FILMSTRIP_FADE_OUT_DP = 18f;
+
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -369,7 +366,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (pager == null || filmstripMode) return;
         filmstripMode = true;
         applyFilmstripPreview(1f);
-        pager.setOffscreenPageLimit(3);
+        pager.setOffscreenPageLimit(2);
     }
 
     private void exitFilmstripMode() {
@@ -422,113 +419,100 @@ public class AlbumViewerActivity extends AppCompatActivity {
         pagerPadBottom = pager.getPaddingBottom();
     }
 
-    private void applyFilmstripPreview(float progress) {
-        if (pager == null) return;
-        capturePagerPaddingIfNeeded();
+    private void applyFilmstripPreview(float p) {
+        final float density = getResources().getDisplayMetrics().density;
+        final float progress = Math.max(0f, Math.min(1f, p));
 
-        float clamped = Math.min(1f, Math.max(0f, progress));
-        filmstripPreviewProgress = clamped;
+        final float scaleDown = FILMSTRIP_SCALE_DOWN;
+        final float pullInMaxPx = FILMSTRIP_PULL_IN_DP * density;
+        final float pageGapPx = FILMSTRIP_PAGE_GAP_DP * density * progress;
+        final float baseSpacingPx = (getResources().getDisplayMetrics().widthPixels * 0.87f) + pageGapPx;
+        final float fadeOutPx = FILMSTRIP_FADE_OUT_DP * density * progress;
 
-        boolean enable = clamped > 0f;
-        pager.setClipToPadding(!enable);
-        pager.setClipChildren(!enable);
-
-        ViewGroup rv = (ViewGroup) pager.getChildAt(0);
-        if (rv != null) {
-            rv.setClipToPadding(!enable);
-            rv.setClipChildren(!enable);
-        }
-
-        // Reveal neighbor pages while keeping the seam small.
-        float sidePx = dpToPx(FILMSTRIP_SIDE_PADDING_DP) * clamped;
-
-        pager.setPadding(
-                (int) (pagerPadStart + sidePx),
-                pagerPadTop,
-                (int) (pagerPadEnd + sidePx),
-                pagerPadBottom
-        );
+        // 中心小死区：避免 bias 在 0 附近抖动翻转
+        final float centerBiasDeadZone = 0.08f;
+        // 平滑方向因子范围：避免“吸附感”（sign 突变）
+        final float sideBlendRange = 0.22f;
 
         pager.setPageTransformer((page, position) -> {
-            final float raw = position;
-            final float abs = Math.abs(raw);
-            final float absClamped = Math.min(1f, abs);
+            final float absPos = Math.abs(position);
+            final float absClamped = Math.min(1f, absPos);
 
-            // 0..1: filmstrip progress
-            float progressNorm = (1f - filmstripScale) / (1f - ZoomableImageView.FILMSTRIP_STICKY);
-            float p = Math.max(0f, Math.min(1f, progressNorm));
-
-            if (p <= 0f) {
-                page.setAlpha(1f);
+            // 非 filmstrip 或进度接近 0：完全复位
+            if (progress <= 0.001f || !filmstripMode) {
                 page.setScaleX(1f);
                 page.setScaleY(1f);
-                page.setPivotX(page.getWidth() * 0.5f);
-                page.setPivotY(page.getHeight() * 0.5f);
                 page.setTranslationX(0f);
+                page.setAlpha(1f);
                 ViewCompat.setTranslationZ(page, 0f);
+                page.setPivotX(page.getWidth() / 2f);
+                page.setPivotY(page.getHeight() / 2f);
 
-                if (page instanceof ViewGroup) {
-                    ViewGroup g = (ViewGroup) page;
-                    for (int i = 0; i < g.getChildCount(); i++) {
-                        View v = g.getChildAt(i);
-                        if (v instanceof ZoomableImageView) {
-                            ((ZoomableImageView) v).setFilmstripEdgeBiasX(0f);
-                        }
-                    }
-                }
+                ZoomableImageView z = page.findViewById(R.id.albumViewerImageView);
+                if (z != null) z.setFilmstripEdgeBiasX(0f);
                 return;
             }
 
-            // ---- scale (continuous) ----
-            float baseScale = 1f - (1f - 0.985f) * p;
-            float scaleVal = baseScale - 0.03f * absClamped * p;
+            // 1) 缩放（与位置连续）
+            final float t = absClamped;
+            final float scaleVal = 1f - (1f - scaleDown) * t;
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
 
-            // pivot lock: right page -> left edge, left page -> right edge
-            if (raw > 0.02f) {
+            // 2) 锁边 pivot（右页锁左边、左页锁右边）
+            if (position > 0f) {
                 page.setPivotX(0f);
-            } else if (raw < -0.02f) {
+            } else if (position < 0f) {
                 page.setPivotX(page.getWidth());
             } else {
-                page.setPivotX(page.getWidth() * 0.5f);
+                page.setPivotX(page.getWidth() / 2f);
             }
-            page.setPivotY(page.getHeight() * 0.5f);
+            page.setPivotY(page.getHeight() / 2f);
 
-            // ---- translation (continuous, no segment snap) ----
-            float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * p;
-            float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * p;
+            // 3) 位移（连续，不用硬 sign 跳变）
+            final float overlapPx = (1f - scaleVal) * page.getWidth() * 0.5f;
+            final float pullInPx = pullInMaxPx * progress;
+            final float inwardPx = overlapPx + pageGapPx * 0.5f + pullInPx;
 
-            float baseTx = -raw * page.getWidth();
-            float overlapPx = page.getWidth() * (1f - scaleVal) * 0.5f;
-            float sideShiftPx = (pageGapPx + overlapPx - pullInPx) * absClamped;
-            page.setTranslationX(baseTx + Math.signum(raw) * sideShiftPx);
+            float side = position / sideBlendRange;
+            if (side > 1f) side = 1f;
+            if (side < -1f) side = -1f;
 
-            // ---- alpha / z ----
-            page.setAlpha(1f - 0.08f * p * absClamped);
+            final float translationX = (-position * baseSpacingPx) - (side * inwardPx);
+            page.setTranslationX(translationX);
 
-            float z = (1f - absClamped) * 10f;
-            if (pagerScrollDir > 0 && raw > 0f) z += 0.001f;
-            else if (pagerScrollDir < 0 && raw < 0f) z += 0.001f;
-            ViewCompat.setTranslationZ(page, z);
+            // 4) 淡出
+            float alpha = 1f;
+            if (fadeOutPx > 0f && absPos > 1f) {
+                final float overPx = (absPos - 1f) * page.getWidth();
+                alpha = Math.max(0f, 1f - overPx / fadeOutPx);
+            }
+            page.setAlpha(alpha);
 
-            // ---- inner image edge bias (dead-zone to avoid center jitter) ----
-            float edgeT = Math.max(0f, (absClamped - 0.08f) / 0.92f);
-            float biasX = Math.signum(raw) * edgeT;
+            // 5) Z 序（加极小偏置，打破平手，防“互相盖住”）
+            final float zOrder = (1f - absClamped) * 10f + (position < 0f ? 0.001f : 0f);
+            ViewCompat.setTranslationZ(page, zOrder);
 
-            if (page instanceof ViewGroup) {
-                ViewGroup g = (ViewGroup) page;
-                for (int i = 0; i < g.getChildCount(); i++) {
-                    View v = g.getChildAt(i);
-                    if (v instanceof ZoomableImageView) {
-                        ((ZoomableImageView) v).setFilmstripEdgeBiasX(biasX);
-                    }
+            // 6) 侧页显示真实边缘：只按左右/中判定，不用连续 bias
+            ZoomableImageView zView = page.findViewById(R.id.albumViewerImageView);
+            if (zView != null) {
+                final float bias;
+                if (position > centerBiasDeadZone) {
+                    bias = -1f;      // 右页 -> 贴左边，露真实左边缘
+                } else if (position < -centerBiasDeadZone) {
+                    bias = 1f;       // 左页 -> 贴右边，露真实右边缘
+                } else {
+                    bias = 0f;       // 中央页居中
                 }
+                zView.setFilmstripEdgeBiasX(bias);
             }
         });
 
-        pager.setOffscreenPageLimit(enable ? 3 : 1);
+        pager.requestTransform();
     }
+
+
+
 
     private void handleFilmstripTap(float x) {
         if (pager == null || adapter == null) return;
