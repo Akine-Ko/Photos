@@ -275,7 +275,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
             public void onPageSelected(int position) {
                 updateCounter();
                 if (filmstripMode) {
-                    pager.post(() -> syncFilmstripScaleToVisiblePages(false, true));
+                    pager.post(() -> {
+                        if (filmstripMode && pager.getScrollState() == ViewPager2.SCROLL_STATE_IDLE) {
+                            syncFilmstripScaleToVisiblePages(false, true);
+                        }
+                    });
                 }
             }
         });
@@ -446,10 +450,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
         );
 
         pager.setPageTransformer((page, position) -> {
-            // Filmstrip progress 0..1 (0 = normal, 1 = sticky filmstrip)
+            final float raw = position;
+            final float abs = Math.abs(raw);
+            final float absClamped = Math.min(1f, abs);
+
+            // 0..1: filmstrip progress
             float progressNorm = (1f - filmstripScale) / (1f - ZoomableImageView.FILMSTRIP_STICKY);
-            float clampedProgress = Math.min(1f, Math.max(0f, progressNorm));
-            if (clampedProgress <= 0f) {
+            float p = Math.max(0f, Math.min(1f, progressNorm));
+
+            if (p <= 0f) {
                 page.setAlpha(1f);
                 page.setScaleX(1f);
                 page.setScaleY(1f);
@@ -458,7 +467,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 page.setTranslationX(0f);
                 ViewCompat.setTranslationZ(page, 0f);
 
-                // Reset edge-bias when not in filmstrip.
                 if (page instanceof ViewGroup) {
                     ViewGroup g = (ViewGroup) page;
                     for (int i = 0; i < g.getChildCount(); i++) {
@@ -471,52 +479,51 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 return;
             }
 
-            final float pageW = page.getWidth();
-            final float pageH = page.getHeight();
-
-            final float absPos = Math.abs(position);
-            final float clampedPos = Math.min(1f, absPos); // [0,1]
-            final float t = 1f - clampedPos;               // center influence: center=1, side=0
-
-            // 1) scale: continuous
-            final float scaleDown = 1f + (0.985f - 1f) * clampedProgress;
-            final float scaleVal = 1f - (1f - scaleDown) * t;
+            // ---- scale (continuous) ----
+            float baseScale = 1f - (1f - 0.985f) * p;
+            float scaleVal = baseScale - 0.03f * absClamped * p;
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
 
-            // 2) pivotX: smooth from center to edge
-            final float centerPivotX = pageW * 0.5f;
-            final float edgePivotX = position >= 0f ? 0f : pageW;
-            final float pivotBlend = clampedPos; // 0=center, 1=edge
-            page.setPivotX(centerPivotX + (edgePivotX - centerPivotX) * pivotBlend);
-            page.setPivotY(pageH * 0.5f);
-
-            // 3) translation: continuous (no signum)
-            final float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clampedProgress;
-            final float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clampedProgress;
-            final float base = -position * pageW * 0.13f;
-            final float overlap = -position * pageGapPx;
-            final float pullIn = -position * t * pullInPx;
-            page.setTranslationX(base + overlap + pullIn);
-
-            // 4) side fade
-            final float sideFadeThreshold = 1f;
-            float fade = 0f;
-            if (absPos <= 1f) {
-                fade = Math.max(0f, 1f - (absPos / Math.max(0.0001f, sideFadeThreshold)));
+            // pivot lock: right page -> left edge, left page -> right edge
+            if (raw > 0.02f) {
+                page.setPivotX(0f);
+            } else if (raw < -0.02f) {
+                page.setPivotX(page.getWidth());
+            } else {
+                page.setPivotX(page.getWidth() * 0.5f);
             }
-            page.setAlpha(1f - 0.18f * fade);
+            page.setPivotY(page.getHeight() * 0.5f);
 
-            // 5) Z: continuous
-            ViewCompat.setTranslationZ(page, (1f - clampedPos) * 10f);
+            // ---- translation (continuous, no segment snap) ----
+            float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * p;
+            float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * p;
 
-            // 6) edge bias: continuous
-            ZoomableImageView zv = page.findViewById(R.id.albumViewerImageView);
-            if (zv != null) {
-                float bias = -position;
-                if (bias > 1f) bias = 1f;
-                if (bias < -1f) bias = -1f;
-                zv.setFilmstripEdgeBiasX(bias);
+            float baseTx = -raw * page.getWidth();
+            float overlapPx = page.getWidth() * (1f - scaleVal) * 0.5f;
+            float sideShiftPx = (pageGapPx + overlapPx - pullInPx) * absClamped;
+            page.setTranslationX(baseTx + Math.signum(raw) * sideShiftPx);
+
+            // ---- alpha / z ----
+            page.setAlpha(1f - 0.08f * p * absClamped);
+
+            float z = (1f - absClamped) * 10f;
+            if (pagerScrollDir > 0 && raw > 0f) z += 0.001f;
+            else if (pagerScrollDir < 0 && raw < 0f) z += 0.001f;
+            ViewCompat.setTranslationZ(page, z);
+
+            // ---- inner image edge bias (dead-zone to avoid center jitter) ----
+            float edgeT = Math.max(0f, (absClamped - 0.08f) / 0.92f);
+            float biasX = Math.signum(raw) * edgeT;
+
+            if (page instanceof ViewGroup) {
+                ViewGroup g = (ViewGroup) page;
+                for (int i = 0; i < g.getChildCount(); i++) {
+                    View v = g.getChildAt(i);
+                    if (v instanceof ZoomableImageView) {
+                        ((ZoomableImageView) v).setFilmstripEdgeBiasX(biasX);
+                    }
+                }
             }
         });
 
