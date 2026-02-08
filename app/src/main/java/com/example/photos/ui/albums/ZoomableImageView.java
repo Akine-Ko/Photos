@@ -32,7 +32,8 @@ public class ZoomableImageView extends AppCompatImageView {
     // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
     public static final float FILMSTRIP_ENTER = 0.95f;  // start revealing neighbors (pinch down)
     public static final float FILMSTRIP_EXIT = 0.985f;  // exit filmstrip when zoomed back (must be > enter)
-
+    // -1 = stick right edge, 0 = center, +1 = stick left edge
+    private float filmstripEdgeBiasX = 0f;
     /**
      * Filmstrip target scale.
      *
@@ -325,12 +326,19 @@ public class ZoomableImageView extends AppCompatImageView {
         float viewWidth = getWidth();
         float viewHeight = getHeight();
         if (rect.width() <= viewWidth) {
-            deltaX = (viewWidth - rect.width()) / 2f - rect.left;
+            if (filmstripEdgeBiasX > 0.01f) {
+                deltaX = -rect.left;                 // 贴左边
+            } else if (filmstripEdgeBiasX < -0.01f) {
+                deltaX = viewWidth - rect.right;     // 贴右边
+            } else {
+                deltaX = (viewWidth - rect.width()) / 2f - rect.left; // 居中
+            }
         } else if (rect.left > 0) {
             deltaX = -rect.left;
         } else if (rect.right < viewWidth) {
             deltaX = viewWidth - rect.right;
         }
+
         if (rect.height() <= viewHeight) {
             deltaY = (viewHeight - rect.height()) / 2f - rect.top;
         } else if (rect.top > 0) {
@@ -480,7 +488,7 @@ public class ZoomableImageView extends AppCompatImageView {
         // At or below minScale (commit), stick there.
         if (scale <= minScale + 0.001f) {
             if (Math.abs(scale - minScale) > 0.0005f) {
-                animateToScale(minScale, true);
+                animateToScale(minScale, false);
             }
             return;
         }
@@ -490,7 +498,7 @@ public class ZoomableImageView extends AppCompatImageView {
         // Only 2 snap targets:
         // - If you reached filmstrip (<= commit): we already returned above.
         // - Otherwise: bounce back to full size.
-        animateToScale(1f, true);
+        animateToScale(1f, false);
     }
 
     public boolean isScalingInProgress() {
@@ -507,5 +515,13 @@ public class ZoomableImageView extends AppCompatImageView {
 
         // Consume only when handling multi-touch / scaling; let single-finger events belong to the pager.
         return event.getPointerCount() > 1 || scalingInProgress;
+    }
+
+    public void setFilmstripEdgeBiasX(float biasX) {
+        float clamped = clamp(biasX, -1f, 1f);
+        if (Math.abs(clamped - filmstripEdgeBiasX) < 0.001f) return;
+        filmstripEdgeBiasX = clamped;
+        checkBounds();
+        applyMatrix();
     }
 }

@@ -342,24 +342,37 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private void onScaleChanged(int position, float scale, boolean fromUser) {
         if (pager == null) return;
         if (position != pager.getCurrentItem()) return;
+
         final float enter = ZoomableImageView.FILMSTRIP_ENTER;
         final float exit = ZoomableImageView.FILMSTRIP_EXIT;
+
         applyFilmstripPreviewProgress(scale);
-        if (fromUser && scale < 1f) {
-            filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_STICKY, Math.min(scale, 1f));
-            if (filmstripMode) {
-                syncFilmstripScaleToVisiblePages(false, true);
+
+        if (scale < 1f) {
+            float newScale = Math.max(ZoomableImageView.FILMSTRIP_STICKY, Math.min(scale, 1f));
+            if (Math.abs(newScale - filmstripScale) > 0.0005f) {
+                filmstripScale = newScale;
+                // 仅用户手势时同步，且不覆盖当前页（避免当前页动画/手势被反写）
+                if (filmstripMode && fromUser) {
+                    syncFilmstripScaleToVisiblePages(false, false);
+                }
             }
         }
+
         if (fromUser && !filmstripMode && scale <= enter) {
             filmstripScale = Math.max(ZoomableImageView.FILMSTRIP_STICKY, Math.min(scale, 1f));
             enterFilmstripMode();
-            syncFilmstripScaleToVisiblePages(false, true);
-        } else if (fromUser && filmstripMode && scale >= exit) {
+            syncFilmstripScaleToVisiblePages(false, false); // 当前页不再写
+            return;
+        }
+
+        // 退出不强依赖 fromUser，程序性回弹到 exit 以上也应退出
+        if (filmstripMode && scale >= exit) {
             exitFilmstripMode();
             syncFilmstripScaleToVisiblePages(true, true);
         }
     }
+
 
     private void enterFilmstripMode() {
         if (pager == null || filmstripMode) return;
@@ -491,13 +504,8 @@ public class AlbumViewerActivity extends AppCompatActivity {
             float posScale = baseScale - 0.03f * absClamped * clampedProgress;
             float scaleVal = Math.max(baseScale, posScale);
 
-            if (raw > 0.02f) {
-                page.setPivotX(0f); // right page: stick LEFT edge
-            } else if (raw < -0.02f) {
-                page.setPivotX(page.getWidth()); // left page: stick RIGHT edge
-            } else {
-                page.setPivotX(page.getWidth() * 0.5f);
-            }
+            page.setPivotX(page.getWidth() * 0.5f);
+
             page.setPivotY(page.getHeight() * 0.5f);
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
@@ -505,8 +513,15 @@ public class AlbumViewerActivity extends AppCompatActivity {
             // --- alpha / depth ---
             page.setAlpha(1f - 0.08f * clampedProgress * absClamped);
 
-            float z = (1f - absClamped) * clampedProgress;
-            ViewCompat.setTranslationZ(page, z);
+            float zBase = (1f - absClamped) * clampedProgress;
+            float zBias = 0f;
+            if (raw > 0f) {
+                zBias = (pagerScrollDir >= 0) ? 0.01f : -0.01f;
+            } else if (raw < 0f) {
+                zBias = (pagerScrollDir <= 0) ? 0.01f : -0.01f;
+            }
+            ViewCompat.setTranslationZ(page, zBase + zBias);
+
 
             // --- edge-bias for the image content inside the page ---
             // bias = +1 => stick LEFT edge; bias = -1 => stick RIGHT edge.
