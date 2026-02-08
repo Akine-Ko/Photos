@@ -20,8 +20,14 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
-import android.widget.*;
+import android.widget.ImageButton;
+import android.widget.EditText;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.graphics.Typeface;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -73,9 +79,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private static final float FILMSTRIP_PAGE_GAP_DP = 2f;
     // How much to pull side pages inward so the seam is thinner (higher = tighter).
     private static final float FILMSTRIP_PULL_IN_DP = 40f;
-    private static final float FILMSTRIP_SCALE_DOWN = 0.985f;
-    private static final float FILMSTRIP_FADE_OUT_DP = 18f;
-
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -105,9 +108,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
     private boolean pagerPadCaptured = false;
     private float filmstripPreviewProgress = 0f;
     private float filmstripScale = 1f;
-    // ViewPager2 scroll direction tracker for stable Z ordering (filmstrip overlap)
-    private float lastPagerScrollPos = 0f;
-    private int pagerScrollDir = 0; // -1 = to previous (left), +1 = to next (right)
     private int touchSlop;
     private float tapDownX;
     private float tapDownY;
@@ -258,25 +258,10 @@ public class AlbumViewerActivity extends AppCompatActivity {
         });
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                // Track scroll direction to break Z-order ties when pages overlap in filmstrip mode.
-                float cur = position + positionOffset;
-                float d = cur - lastPagerScrollPos;
-                if (Math.abs(d) > 1e-4f) {
-                    pagerScrollDir = d > 0f ? 1 : -1;
-                    lastPagerScrollPos = cur;
-                }
-            }
-
-            @Override
             public void onPageSelected(int position) {
                 updateCounter();
                 if (filmstripMode) {
-                    pager.post(() -> {
-                        if (filmstripMode && pager.getScrollState() == ViewPager2.SCROLL_STATE_IDLE) {
-                            syncFilmstripScaleToVisiblePages(false, true);
-                        }
-                    });
+                    pager.post(() -> syncFilmstripScaleToVisiblePages(false, true));
                 }
             }
         });
@@ -366,7 +351,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
         if (pager == null || filmstripMode) return;
         filmstripMode = true;
         applyFilmstripPreview(1f);
-        pager.setOffscreenPageLimit(2);
+        pager.setOffscreenPageLimit(3);
     }
 
     private void exitFilmstripMode() {
@@ -419,100 +404,60 @@ public class AlbumViewerActivity extends AppCompatActivity {
         pagerPadBottom = pager.getPaddingBottom();
     }
 
-    private void applyFilmstripPreview(float p) {
-        final float density = getResources().getDisplayMetrics().density;
-        final float progress = Math.max(0f, Math.min(1f, p));
+    private void applyFilmstripPreview(float progress) {
+        if (pager == null) return;
+        capturePagerPaddingIfNeeded();
 
-        final float scaleDown = FILMSTRIP_SCALE_DOWN;
-        final float pullInMaxPx = FILMSTRIP_PULL_IN_DP * density;
-        final float pageGapPx = FILMSTRIP_PAGE_GAP_DP * density * progress;
-        final float baseSpacingPx = (getResources().getDisplayMetrics().widthPixels * 0.87f) + pageGapPx;
-        final float fadeOutPx = FILMSTRIP_FADE_OUT_DP * density * progress;
+        float clamped = Math.min(1f, Math.max(0f, progress));
+        filmstripPreviewProgress = clamped;
 
-        // 中心小死区：避免 bias 在 0 附近抖动翻转
-        final float centerBiasDeadZone = 0.08f;
-        // 平滑方向因子范围：避免“吸附感”（sign 突变）
-        final float sideBlendRange = 0.22f;
+        boolean enable = clamped > 0f;
+        pager.setClipToPadding(!enable);
+        pager.setClipChildren(!enable);
+
+        ViewGroup rv = (ViewGroup) pager.getChildAt(0);
+        if (rv != null) {
+            rv.setClipToPadding(!enable);
+            rv.setClipChildren(!enable);
+        }
+
+        // Reveal neighbor pages while keeping the seam small.
+        float sidePx = dpToPx(FILMSTRIP_SIDE_PADDING_DP) * clamped;
+
+        pager.setPadding(
+                (int) (pagerPadStart + sidePx),
+                pagerPadTop,
+                (int) (pagerPadEnd + sidePx),
+                pagerPadBottom
+        );
+
+        final float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clamped;
+        final float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clamped;
 
         pager.setPageTransformer((page, position) -> {
-            final float absPos = Math.abs(position);
-            final float absClamped = Math.min(1f, absPos);
+            float p = Math.max(-1f, Math.min(1f, position));
 
-            // 非 filmstrip 或进度接近 0：完全复位
-            if (progress <= 0.001f || !filmstripMode) {
-                page.setScaleX(1f);
-                page.setScaleY(1f);
-                page.setTranslationX(0f);
-                page.setAlpha(1f);
-                ViewCompat.setTranslationZ(page, 0f);
-                page.setPivotX(page.getWidth() / 2f);
-                page.setPivotY(page.getHeight() / 2f);
+            // IMPORTANT: don't scale the page view itself.
+            // View scaling doesn't change hit-testing bounds (tap area stays large), which makes
+            // "black seam" taps / neighbor taps feel wrong. We scale the *image content* using
+            // ZoomableImageView.setDesiredScale(...) instead.
+            page.setScaleX(1f);
+            page.setScaleY(1f);
 
-                ZoomableImageView z = page.findViewById(R.id.albumViewerImageView);
-                if (z != null) z.setFilmstripEdgeBiasX(0f);
-                return;
-            }
+            // Make the seam thinner:
+            // - "pull in" pages a bit toward center (negative sign)
+            // - keep a tiny configurable gap so pages don't overlap visually
+            page.setTranslationX((-p * pullInPx) + (-p * pageGapPx));
 
-            // 1) 缩放（与位置连续）
-            final float t = absClamped;
-            final float scaleVal = 1f - (1f - scaleDown) * t;
-            page.setScaleX(scaleVal);
-            page.setScaleY(scaleVal);
+            // Fade side pages a bit.
+            page.setAlpha(1f - 0.08f * clamped * Math.abs(p));
 
-            // 2) 锁边 pivot（右页锁左边、左页锁右边）
-            if (position > 0f) {
-                page.setPivotX(0f);
-            } else if (position < 0f) {
-                page.setPivotX(page.getWidth());
-            } else {
-                page.setPivotX(page.getWidth() / 2f);
-            }
-            page.setPivotY(page.getHeight() / 2f);
-
-            // 3) 位移（连续，不用硬 sign 跳变）
-            final float overlapPx = (1f - scaleVal) * page.getWidth() * 0.5f;
-            final float pullInPx = pullInMaxPx * progress;
-            final float inwardPx = overlapPx + pageGapPx * 0.5f + pullInPx;
-
-            float side = position / sideBlendRange;
-            if (side > 1f) side = 1f;
-            if (side < -1f) side = -1f;
-
-            final float translationX = (-position * baseSpacingPx) - (side * inwardPx);
-            page.setTranslationX(translationX);
-
-            // 4) 淡出
-            float alpha = 1f;
-            if (fadeOutPx > 0f && absPos > 1f) {
-                final float overPx = (absPos - 1f) * page.getWidth();
-                alpha = Math.max(0f, 1f - overPx / fadeOutPx);
-            }
-            page.setAlpha(alpha);
-
-            // 5) Z 序（加极小偏置，打破平手，防“互相盖住”）
-            final float zOrder = (1f - absClamped) * 10f + (position < 0f ? 0.001f : 0f);
-            ViewCompat.setTranslationZ(page, zOrder);
-
-            // 6) 侧页显示真实边缘：只按左右/中判定，不用连续 bias
-            ZoomableImageView zView = page.findViewById(R.id.albumViewerImageView);
-            if (zView != null) {
-                final float bias;
-                if (position > centerBiasDeadZone) {
-                    bias = -1f;      // 右页 -> 贴左边，露真实左边缘
-                } else if (position < -centerBiasDeadZone) {
-                    bias = 1f;       // 左页 -> 贴右边，露真实右边缘
-                } else {
-                    bias = 0f;       // 中央页居中
-                }
-                zView.setFilmstripEdgeBiasX(bias);
-            }
+            // Bring center page to front.
+            ViewCompat.setTranslationZ(page, (1f - Math.abs(p)) * clamped);
         });
 
-        pager.requestTransform();
+        pager.setOffscreenPageLimit(enable ? 3 : 1);
     }
-
-
-
 
     private void handleFilmstripTap(float x) {
         if (pager == null || adapter == null) return;
@@ -1293,7 +1238,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
                     } else {
                         imageView.setDesiredScale(initScale, false);
                     }
-                    imageView.setFilmstripEdgeBiasX(0f);
                     imageView.setOnClickListener(v -> handleClick());
                     imageView.setOnTransformListener(() -> {
                         if (onHideChrome != null) onHideChrome.run();

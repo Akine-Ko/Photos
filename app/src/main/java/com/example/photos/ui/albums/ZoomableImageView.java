@@ -28,7 +28,6 @@ public class ZoomableImageView extends AppCompatImageView {
     private final Matrix drawMatrix = new Matrix();
     private final float[] matrixValues = new float[9];
     private final RectF contentRect = new RectF();
-    private float filmstripEdgeBiasX = 0f;
     private static final float PAN_THRESHOLD = 1.05f; // allow ViewPager when near base scale
     // Enter filmstrip as you shrink; exit when you almost reach full size; commit decides snap-back.
     public static final float FILMSTRIP_ENTER = 0.95f;  // start revealing neighbors (pinch down)
@@ -267,15 +266,6 @@ public class ZoomableImageView extends AppCompatImageView {
         desiredScale = 1f;
     }
 
-    public void setFilmstripEdgeBiasX(float bias) {
-        float b = clamp(bias, -1f, 1f);
-        if (Math.abs(filmstripEdgeBiasX - b) < 0.001f) return;
-        filmstripEdgeBiasX = b;
-        checkBounds();
-        applyMatrix();
-    }
-
-
     private void applyDesiredScaleIfNeeded() {
         if (!hasDesiredScale) return;
         if (getDrawable() == null || getWidth() == 0 || getHeight() == 0) return;
@@ -329,66 +319,26 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     private void checkBounds() {
-        if (getDrawable() == null) return;
-
         RectF rect = getDisplayRect();
         if (rect == null) return;
-
-        final float viewWidth = getWidth();
-        final float viewHeight = getHeight();
-
-        float deltaX = 0f;
-        float deltaY = 0f;
-
-        // ---------- X: support filmstripEdgeBiasX for both narrow and wide images ----------
-        float bias = filmstripEdgeBiasX;
-
-        if (Math.abs(bias) > 0.0001f) {
-            if (rect.width() <= viewWidth) {
-                float centerTx = (viewWidth - rect.width()) * 0.5f;
-                float leftTx = 0f;
-                float rightTx = viewWidth - rect.width();
-
-                float b = clamp(bias, -1f, 1f);
-                float targetTx;
-                if (b > 0f) {
-                    // 0 -> center, +1 -> left
-                    targetTx = centerTx + (leftTx - centerTx) * b;
-                } else if (b < 0f) {
-                    // 0 -> center, -1 -> right
-                    targetTx = centerTx + (rightTx - centerTx) * (-b);
-                } else {
-                    targetTx = centerTx;
-                }
-                deltaX = targetTx - rect.left;
-            } else {
-                // Wide image: left can be in [viewWidth - rectW, 0] (all <=0)
-                float t = (1f - bias) * 0.5f; // +1=>0, 0=>0.5, -1=>1
-                float minLeft = viewWidth - rect.width(); // <=0
-                float desiredLeft = 0f + (minLeft - 0f) * t; // lerp(0 -> minLeft)
-                deltaX = desiredLeft - rect.left;
-            }
-        } else {
-            // Original default: center narrow images; clamp wide images to edges
-            if (rect.width() <= viewWidth) {
-                deltaX = (viewWidth - rect.width()) * 0.5f - rect.left;
-            } else {
-                if (rect.left > 0) deltaX = -rect.left;
-                else if (rect.right < viewWidth) deltaX = viewWidth - rect.right;
-            }
+        float deltaX = 0, deltaY = 0;
+        float viewWidth = getWidth();
+        float viewHeight = getHeight();
+        if (rect.width() <= viewWidth) {
+            deltaX = (viewWidth - rect.width()) / 2f - rect.left;
+        } else if (rect.left > 0) {
+            deltaX = -rect.left;
+        } else if (rect.right < viewWidth) {
+            deltaX = viewWidth - rect.right;
         }
-
-        // ---------- Y: keep original centering/clamp ----------
         if (rect.height() <= viewHeight) {
-            deltaY = (viewHeight - rect.height()) * 0.5f - rect.top;
-        } else {
-            if (rect.top > 0) deltaY = -rect.top;
-            else if (rect.bottom < viewHeight) deltaY = viewHeight - rect.bottom;
+            deltaY = (viewHeight - rect.height()) / 2f - rect.top;
+        } else if (rect.top > 0) {
+            deltaY = -rect.top;
+        } else if (rect.bottom < viewHeight) {
+            deltaY = viewHeight - rect.bottom;
         }
-
-        if (Math.abs(deltaX) > 0.001f || Math.abs(deltaY) > 0.001f) {
-            supportMatrix.postTranslate(deltaX, deltaY);
-        }
+        supportMatrix.postTranslate(deltaX, deltaY);
     }
 
     private void applyMatrix() {
