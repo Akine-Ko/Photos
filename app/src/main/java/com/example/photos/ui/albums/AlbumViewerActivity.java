@@ -74,11 +74,11 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
     // --- Filmstrip tuning knobs (dp) ---
     // How much neighbor page to reveal on each side at full filmstrip (progress=1).
-    private static final float FILMSTRIP_SIDE_PADDING_DP = 72f;
+    private static final float FILMSTRIP_SIDE_PADDING_DP = 56f;
     // Visual gap between pages at full filmstrip (keep small; we also "pull in" using translation).
-    private static final float FILMSTRIP_PAGE_GAP_DP = 2f;
+    private static final float FILMSTRIP_PAGE_GAP_DP = 10f;
     // How much to pull side pages inward so the seam is thinner (higher = tighter).
-    private static final float FILMSTRIP_PULL_IN_DP = 40f;
+    private static final float FILMSTRIP_PULL_IN_DP = 0f;
 
     private static final RequestOptions VIEWER_OPTIONS = new RequestOptions()
             .fitCenter()
@@ -448,7 +448,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             rv.setClipChildren(!enable);
         }
 
-        // Reveal neighbor pages while keeping the seam small.
+        // Reveal neighbor pages on both sides.
         float sidePx = dpToPx(FILMSTRIP_SIDE_PADDING_DP) * clamped;
 
         pager.setPadding(
@@ -459,8 +459,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
         );
 
         pager.setPageTransformer((page, position) -> {
-            // IMPORTANT:
-            // - Use raw position for translation. Clamping stacks pages (position 1 & 2 overlap).
             final float raw = position;
             final float abs = Math.abs(raw);
             final float absClamped = Math.min(1f, abs);
@@ -468,6 +466,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             // Filmstrip progress 0..1 (0 = normal, 1 = sticky filmstrip)
             float progressNorm = (1f - filmstripScale) / (1f - ZoomableImageView.FILMSTRIP_STICKY);
             float clampedProgress = Math.min(1f, Math.max(0f, progressNorm));
+
             if (clampedProgress <= 0f) {
                 page.setAlpha(1f);
                 page.setScaleX(1f);
@@ -477,7 +476,6 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 page.setTranslationX(0f);
                 ViewCompat.setTranslationZ(page, 0f);
 
-                // Reset edge-bias when not in filmstrip.
                 if (page instanceof ViewGroup) {
                     ViewGroup g = (ViewGroup) page;
                     for (int i = 0; i < g.getChildCount(); i++) {
@@ -490,44 +488,30 @@ public class AlbumViewerActivity extends AppCompatActivity {
                 return;
             }
 
-            // --- spacing / pull-in ---
+            // Keep pages separated (outward) to avoid post-snap mutual overlap.
+            float gapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clampedProgress;
+            float dir = raw == 0f ? 0f : Math.signum(raw);
             float pullInPx = dpToPx(FILMSTRIP_PULL_IN_DP) * clampedProgress;
-            float pageGapPx = dpToPx(FILMSTRIP_PAGE_GAP_DP) * clampedProgress;
-            float squeezePx = pullInPx + pageGapPx;
+            float outward = gapPx * absClamped;
+            float inwardNearCenter = pullInPx * Math.max(0f, 1f - abs); // only while crossing center
+            page.setTranslationX(dir * outward - dir * inwardNearCenter);
 
-            // Use RAW position here to avoid stacking (position=1,2,3 must NOT share the same transform)
-            page.setTranslationX(-squeezePx * raw);
-
-            // --- page scale + locked pivot (keep visual style) ---
-            float scaleDown = 0.985f; // small mode page scale
-            float baseScale = 1f + (scaleDown - 1f) * clampedProgress;
-            float posScale = baseScale - 0.03f * absClamped * clampedProgress;
-            float scaleVal = Math.max(baseScale, posScale);
-
+            // Uniform page scale in filmstrip, avoid differential squeeze side-vs-center.
+            float scaleDown = 0.985f;
+            float scaleVal = 1f + (scaleDown - 1f) * clampedProgress;
             page.setPivotX(page.getWidth() * 0.5f);
-
             page.setPivotY(page.getHeight() * 0.5f);
             page.setScaleX(scaleVal);
             page.setScaleY(scaleVal);
 
-            // --- alpha / depth ---
-            page.setAlpha(1f - 0.08f * clampedProgress * absClamped);
+            page.setAlpha(1f - 0.06f * clampedProgress * absClamped);
+            ViewCompat.setTranslationZ(page, (1f - absClamped) * clampedProgress);
 
-            float zBase = (1f - absClamped) * clampedProgress;
-            float zBias = 0f;
-            if (raw > 0f) {
-                zBias = (pagerScrollDir >= 0) ? 0.01f : -0.01f;
-            } else if (raw < 0f) {
-                zBias = (pagerScrollDir <= 0) ? 0.01f : -0.01f;
-            }
-            ViewCompat.setTranslationZ(page, zBase + zBias);
-
-
-            // --- edge-bias for the image content inside the page ---
-            // bias = +1 => stick LEFT edge; bias = -1 => stick RIGHT edge.
+            // Bias content toward seam edges for side pages (smooth ramp, no abrupt snapping near center).
             float biasX = 0f;
-            if (abs > 0.0001f) {
-                biasX = raw > 0f ? +1f : -1f;
+            if (abs > 0.15f) {
+                float t = Math.min(1f, (abs - 0.15f) / 0.60f); // 0.15->0, 0.75->1
+                biasX = (raw > 0f ? +1f : -1f) * t;
             }
             if (page instanceof ViewGroup) {
                 ViewGroup g = (ViewGroup) page;
@@ -582,6 +566,7 @@ public class AlbumViewerActivity extends AppCompatActivity {
             ZoomableImageView iv = page.findViewById(R.id.albumViewerImageView);
             if (iv == null) continue;
             if (resetToFit) {
+                iv.setFilmstripEdgeBiasX(0f);
                 iv.clearDesiredScale();
                 iv.setDesiredScale(1f, false);
             } else {

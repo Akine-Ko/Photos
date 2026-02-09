@@ -103,9 +103,9 @@ public class ZoomableImageView extends AppCompatImageView {
     public boolean onTouchEvent(MotionEvent event) {
         if (getDrawable() == null) return super.onTouchEvent(event);
         if (event.getActionMasked() == MotionEvent.ACTION_DOWN
-                && getCurrentScale() < 0.999f
+                && getCurrentScale() <= FILMSTRIP_EXIT
                 && !scalingInProgress) {
-            // When scaled down (filmstrip), let the pager take the gesture immediately for reliable flings.
+            // In filmstrip state, let ViewPager2 own single-finger swipes for stable paging.
             return false;
         }
         gestureDetector.onTouchEvent(event);
@@ -326,10 +326,11 @@ public class ZoomableImageView extends AppCompatImageView {
         float viewWidth = getWidth();
         float viewHeight = getHeight();
         if (rect.width() <= viewWidth) {
-            if (filmstripEdgeBiasX > 0.01f) {
-                deltaX = -rect.left;                 // 贴左边
-            } else if (filmstripEdgeBiasX < -0.01f) {
-                deltaX = viewWidth - rect.right;     // 贴右边
+            float effectiveBias = getCurrentScale() <= FILMSTRIP_EXIT + 0.01f ? filmstripEdgeBiasX : 0f;
+            if (effectiveBias > 0.01f) {
+                deltaX = -rect.left;                 // 贴左�?
+            } else if (effectiveBias < -0.01f) {
+                deltaX = viewWidth - rect.right;     // 贴右�?
             } else {
                 deltaX = (viewWidth - rect.width()) / 2f - rect.left; // 居中
             }
