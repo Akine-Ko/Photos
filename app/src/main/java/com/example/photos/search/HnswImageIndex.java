@@ -27,6 +27,8 @@ public final class HnswImageIndex {
 
     private final Object lock = new Object();
     private HnswIndex<String, float[], VectorItem, Float> index;
+    private long loadedFileModified = -1L;
+    private long loadedFileLength = -1L;
     private final File indexFile;
     private final File legacyCacheFile;
 
@@ -44,7 +46,7 @@ public final class HnswImageIndex {
 
     public void clear() {
         synchronized (lock) {
-            index = null;
+            clearLoadedStateLocked();
         }
         deleteIfExists(indexFile);
         deleteIfExists(legacyCacheFile);
@@ -55,6 +57,7 @@ public final class HnswImageIndex {
             if (index == null) return;
             try (FileOutputStream fos = new FileOutputStream(indexFile)) {
                 index.save(fos);
+                rememberFileStampLocked(indexFile);
             } catch (Exception e) {
                 Log.w(TAG, "save hnsw failed", e);
             }
@@ -62,18 +65,32 @@ public final class HnswImageIndex {
     }
 
     public boolean loadIfExists() {
+        File source = null;
+        boolean fromLegacy = false;
         if (indexFile.exists()) {
-            return loadFrom(indexFile);
-        }
-        if (legacyCacheFile.exists()) {
-            boolean loaded = loadFrom(legacyCacheFile);
-            if (loaded) {
-                save();
-                deleteIfExists(legacyCacheFile);
+            source = indexFile;
+        } else if (legacyCacheFile.exists()) {
+            source = legacyCacheFile;
+            fromLegacy = true;
+        } else {
+            synchronized (lock) {
+                clearLoadedStateLocked();
             }
-            return loaded;
+            return false;
         }
-        return false;
+
+        synchronized (lock) {
+            if (index != null && isSameFileStampLocked(source)) {
+                return true;
+            }
+        }
+
+        boolean loaded = loadFrom(source);
+        if (loaded && fromLegacy) {
+            save();
+            deleteIfExists(legacyCacheFile);
+        }
+        return loaded;
     }
 
     public void build(List<VectorItem> items, int dim) {
@@ -89,6 +106,8 @@ public final class HnswImageIndex {
         idx.setEf(EF_SEARCH);
         synchronized (lock) {
             index = idx;
+            loadedFileModified = -1L;
+            loadedFileLength = -1L;
         }
         Log.i(TAG, "hnsw built, size=" + items.size() + " dim=" + dim);
     }
@@ -114,6 +133,7 @@ public final class HnswImageIndex {
             loaded.setEf(EF_SEARCH);
             synchronized (lock) {
                 index = loaded;
+                rememberFileStampLocked(file);
             }
             Log.i(TAG, "loaded hnsw, size=" + loaded.size());
             return true;
@@ -121,6 +141,22 @@ public final class HnswImageIndex {
             Log.w(TAG, "load hnsw failed", e);
             return false;
         }
+    }
+
+    private void clearLoadedStateLocked() {
+        index = null;
+        loadedFileModified = -1L;
+        loadedFileLength = -1L;
+    }
+
+    private void rememberFileStampLocked(File file) {
+        loadedFileModified = file.lastModified();
+        loadedFileLength = file.length();
+    }
+
+    private boolean isSameFileStampLocked(File file) {
+        return loadedFileModified == file.lastModified()
+                && loadedFileLength == file.length();
     }
 
     private static void deleteIfExists(File file) {

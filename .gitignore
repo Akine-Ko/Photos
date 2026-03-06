@@ -42,7 +42,10 @@ gradle-wrapper.jar
 
 /images/
 
-# 捕获的屏幕截图  屏幕截图目录
+# 测试
+/gt/preview_500/
+
+# 屏幕截图目录
 /captures/
 
 # 临时文件和系统文件

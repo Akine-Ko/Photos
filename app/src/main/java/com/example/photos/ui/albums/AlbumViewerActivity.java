@@ -509,8 +509,10 @@ public class AlbumViewerActivity extends AppCompatActivity {
 
             // Bias content toward seam edges for side pages (smooth ramp, no abrupt snapping near center).
             float biasX = 0f;
-            if (abs > 0.15f) {
-                float t = Math.min(1f, (abs - 0.15f) / 0.60f); // 0.15->0, 0.75->1
+            final float biasStart = 0.55f;
+            final float biasEnd = 0.95f;
+            if (abs > biasStart && biasEnd > biasStart) {
+                float t = Math.min(1f, (abs - biasStart) / (biasEnd - biasStart));
                 biasX = (raw > 0f ? +1f : -1f) * t;
             }
             if (page instanceof ViewGroup) {

@@ -1,0 +1,16 @@
+event,group_key,group_value,count,mean_ms,p50_ms,p90_ms,p95_ms,p99_ms,max_ms
+image_query_embedding,cache_hit,false,10,326.40,306.00,428.80,432.40,435.28,436.00
+image_search_ann,index_available,true,10,6.20,2.00,6.50,26.75,42.95,47.00
+image_search_ann,query_cache_hit,false,10,6.20,2.00,6.50,26.75,42.95,47.00
+image_search_ann,used_hnsw,true,10,6.20,2.00,6.50,26.75,42.95,47.00
+image_search_face_rerank,index_available,true,4,311.00,304.00,413.90,437.45,456.29,461.00
+image_search_face_rerank,ran,false,6,249.83,256.50,284.00,287.00,289.40,290.00
+image_search_face_rerank,ran,true,4,311.00,304.00,413.90,437.45,456.29,461.00
+image_search_face_rerank,used_hnsw,true,4,311.00,304.00,413.90,437.45,456.29,461.00
+image_search_total,index_available,true,10,609.10,575.50,739.80,819.90,883.98,900.00
+image_search_total,query_cache_hit,false,10,609.10,575.50,739.80,819.90,883.98,900.00
+image_search_total,used_hnsw,true,10,609.10,575.50,739.80,819.90,883.98,900.00
+text_search_ann,index_available,true,15,6.33,1.00,2.00,24.50,66.50,77.00
+text_search_ann,used_hnsw,true,15,6.33,1.00,2.00,24.50,66.50,77.00
+text_search_total,index_available,true,15,796.27,224.00,420.80,2888.90,7460.18,8603.00
+text_search_total,used_hnsw,true,15,796.27,224.00,420.80,2888.90,7460.18,8603.00

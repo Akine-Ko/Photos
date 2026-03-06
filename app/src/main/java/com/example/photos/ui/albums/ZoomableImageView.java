@@ -327,12 +327,17 @@ public class ZoomableImageView extends AppCompatImageView {
         float viewHeight = getHeight();
         if (rect.width() <= viewWidth) {
             float effectiveBias = getCurrentScale() <= FILMSTRIP_EXIT + 0.01f ? filmstripEdgeBiasX : 0f;
-            if (effectiveBias > 0.01f) {
-                deltaX = -rect.left;                 // 贴左�?
-            } else if (effectiveBias < -0.01f) {
-                deltaX = viewWidth - rect.right;     // 贴右�?
+            float centeredDx = (viewWidth - rect.width()) * 0.5f - rect.left;
+            if (effectiveBias > 0f) {
+                float leftDx = -rect.left;
+                float t = Math.min(1f, effectiveBias);
+                deltaX = centeredDx + (leftDx - centeredDx) * t;
+            } else if (effectiveBias < 0f) {
+                float rightDx = viewWidth - rect.right;
+                float t = Math.min(1f, -effectiveBias);
+                deltaX = centeredDx + (rightDx - centeredDx) * t;
             } else {
-                deltaX = (viewWidth - rect.width()) / 2f - rect.left; // 居中
+                deltaX = centeredDx;
             }
         } else if (rect.left > 0) {
             deltaX = -rect.left;

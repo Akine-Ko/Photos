@@ -24,6 +24,7 @@ import java.util.PriorityQueue;
 public final class TextSearchEngine {
 
     private static final String TAG = "TextSearchEngine";
+    private static volatile HnswImageIndex clipHnsw;
 
     private TextSearchEngine() {}
 
@@ -85,6 +86,7 @@ public final class TextSearchEngine {
         double annMs = SystemClock.elapsedRealtime() - annStart;
         HashMap<String, Object> annExtra = new HashMap<>();
         annExtra.put("used_hnsw", usedHnsw);
+        annExtra.put("index_available", usedHnsw);
         annExtra.put("limit", limit);
         annExtra.put("vectors", records.size());
         PerfLogger.log("text_search_ann", annMs, perfSession, annExtra);
@@ -110,6 +112,7 @@ public final class TextSearchEngine {
         double totalMs = SystemClock.elapsedRealtime() - totalStart;
         HashMap<String, Object> totalExtra = new HashMap<>();
         totalExtra.put("used_hnsw", usedHnsw);
+        totalExtra.put("index_available", usedHnsw);
         totalExtra.put("limit", limit);
         totalExtra.put("results", out.size());
         PerfLogger.log("text_search_total", totalMs, perfSession, totalExtra);
@@ -117,7 +120,7 @@ public final class TextSearchEngine {
     }
 
     private static List<SearchResultInternal> searchWithHnsw(Context context, float[] query, int limit) {
-        HnswImageIndex hnsw = new HnswImageIndex(context.getApplicationContext(), "clip_hnsw.index");
+        HnswImageIndex hnsw = getClipHnsw(context);
         if (!hnsw.loadIfExists()) {
             return null;
         }
@@ -131,6 +134,17 @@ public final class TextSearchEngine {
         ordered.sort((a, b) -> Float.compare(b.score, a.score));
         android.util.Log.i(TAG, "HNSW search used, got=" + ordered.size());
         return ordered;
+    }
+
+    private static HnswImageIndex getClipHnsw(Context context) {
+        if (clipHnsw == null) {
+            synchronized (TextSearchEngine.class) {
+                if (clipHnsw == null) {
+                    clipHnsw = new HnswImageIndex(context.getApplicationContext(), "clip_hnsw.index");
+                }
+            }
+        }
+        return clipHnsw;
     }
 
     private static List<SearchResultInternal> linearSearch(List<FeatureRecord> records, float[] textEmbedding, int limit) {

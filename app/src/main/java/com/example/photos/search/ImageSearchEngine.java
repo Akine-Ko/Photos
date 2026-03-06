@@ -39,6 +39,8 @@ public final class ImageSearchEngine {
     private static final float FACE_BLEND = 0.85f;
     private static final float FACE_SIM_STRONG = 0.6f;
     private static final float FACE_SIM_SOFT = 0.4f;
+    private static volatile HnswImageIndex dinoHnsw;
+    private static volatile HnswImageIndex faceHnsw;
 
     private ImageSearchEngine() {}
 
@@ -75,7 +77,13 @@ public final class ImageSearchEngine {
         Context app = context.getApplicationContext();
         PhotosDb db = PhotosDb.get(app);
         FeatureDao featureDao = db.featureDao();
-        float[] query = loadOrEncodeQuery(app, featureDao, queryAsset);
+        long queryStart = SystemClock.elapsedRealtime();
+        QueryEmbeddingResult queryResult = loadOrEncodeQuery(app, featureDao, queryAsset);
+        double queryMs = SystemClock.elapsedRealtime() - queryStart;
+        HashMap<String, Object> queryExtra = new HashMap<>();
+        queryExtra.put("cache_hit", queryResult.cacheHit);
+        PerfLogger.log("image_query_embedding", queryMs, perfSession, queryExtra);
+        float[] query = queryResult.embedding;
         if (query == null || query.length == 0) {
             android.util.Log.w(TAG, "query embedding is null");
             return Collections.emptyList();
@@ -86,6 +94,8 @@ public final class ImageSearchEngine {
         List<SearchResultInternal> ordered = indexed.results;
         HashMap<String, Object> annExtra = new HashMap<>();
         annExtra.put("used_hnsw", indexed.usedHnsw);
+        annExtra.put("index_available", indexed.usedHnsw);
+        annExtra.put("query_cache_hit", queryResult.cacheHit);
         annExtra.put("limit", topK);
         annExtra.put("results", ordered == null ? 0 : ordered.size());
         PerfLogger.log("image_search_ann", annMs, perfSession, annExtra);
@@ -106,6 +116,8 @@ public final class ImageSearchEngine {
         double totalMs = SystemClock.elapsedRealtime() - totalStart;
         HashMap<String, Object> totalExtra = new HashMap<>();
         totalExtra.put("used_hnsw", indexed.usedHnsw);
+        totalExtra.put("index_available", indexed.usedHnsw);
+        totalExtra.put("query_cache_hit", queryResult.cacheHit);
         totalExtra.put("limit", topK);
         totalExtra.put("results", out.size());
         PerfLogger.log("image_search_total", totalMs, perfSession, totalExtra);
@@ -113,7 +125,7 @@ public final class ImageSearchEngine {
     }
 
     private static SearchWithIndexResult searchWithIndex(Context app, FeatureDao featureDao, float[] query, int topK) {
-        HnswImageIndex hnsw = new HnswImageIndex(app, "dino_hnsw.index");
+        HnswImageIndex hnsw = getDinoHnsw(app);
         boolean usedHnsw = false;
         if (hnsw.loadIfExists()) {
             usedHnsw = true;
@@ -167,10 +179,10 @@ public final class ImageSearchEngine {
         return ordered;
     }
 
-    private static float[] loadOrEncodeQuery(Context context, FeatureDao featureDao, PhotoAsset asset) {
+    private static QueryEmbeddingResult loadOrEncodeQuery(Context context, FeatureDao featureDao, PhotoAsset asset) {
         byte[] cached = featureDao.vectorForKey(asset.contentUri, FeatureType.DINO_IMAGE_EMB.getCode());
         if (cached != null && cached.length > 0) {
-            return FeatureEncoding.bytesToFloats(cached);
+            return new QueryEmbeddingResult(FeatureEncoding.bytesToFloats(cached), true);
         }
         float[] embedding = DinoImageEmbedder.encode(context, asset);
         if (embedding != null) {
@@ -182,7 +194,7 @@ public final class ImageSearchEngine {
             record.updatedAt = System.currentTimeMillis() / 1000L;
             featureDao.upsert(record);
         }
-        return embedding;
+        return new QueryEmbeddingResult(embedding, false);
     }
 
     private static Photo mapToPhoto(PhotoDao photoDao, String mediaKey) {
@@ -213,30 +225,33 @@ public final class ImageSearchEngine {
         int faceCount = 0;
         int candidateCount = 0;
         boolean ran = false;
+        Boolean faceIndexUsedHnsw = null;
         SFaceOpenCv recognizer;
         try {
             recognizer = new SFaceOpenCv(ctx);
         } catch (Exception e) {
             android.util.Log.w(TAG, "face pipeline init failed", e);
-            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran, faceIndexUsedHnsw);
             return base;
         }
         Bitmap qbmp = decodeKeepAspect(ctx, Uri.parse(queryAsset.contentUri), 960);
         if (qbmp == null) {
             android.util.Log.i(TAG, "face rerank: query bitmap null");
-            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran, faceIndexUsedHnsw);
             return base;
         }
         float[][] qfaces = recognizer.embedAll(qbmp);
         qbmp.recycle();
         if (qfaces == null || qfaces.length == 0) {
             android.util.Log.i(TAG, "face rerank: query face embedding null");
-            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran, faceIndexUsedHnsw);
             return base;
         }
         faceCount = qfaces.length;
-        Map<String, Float> faceSims = loadFaceCandidates(ctx, featureDao, qfaces, topK * 5);
+        FaceCandidatesResult faceCandidates = loadFaceCandidates(ctx, featureDao, qfaces, topK * 5);
+        Map<String, Float> faceSims = faceCandidates.scores;
         candidateCount = faceSims.size();
+        faceIndexUsedHnsw = faceCandidates.usedHnsw;
         ran = true;
         Map<String, Float> baseMap = new LinkedHashMap<>();
         if (base != null) {
@@ -269,10 +284,10 @@ public final class ImageSearchEngine {
         fusedList.sort((a, b) -> Float.compare(b.score, a.score));
         if (fusedList.size() > topK) {
             List<SearchResultInternal> out = fusedList.subList(0, topK);
-            logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+            logFaceRerank(perfSession, start, faceCount, candidateCount, ran, faceIndexUsedHnsw);
             return out;
         }
-        logFaceRerank(perfSession, start, faceCount, candidateCount, ran);
+        logFaceRerank(perfSession, start, faceCount, candidateCount, ran, faceIndexUsedHnsw);
         return fusedList;
     }
 
@@ -299,12 +314,12 @@ public final class ImageSearchEngine {
         }
     }
 
-    private static Map<String, Float> loadFaceCandidates(Context ctx,
-                                                         FeatureDao featureDao,
-                                                         float[][] qfaces,
-                                                         int topK) {
+    private static FaceCandidatesResult loadFaceCandidates(Context ctx,
+                                                           FeatureDao featureDao,
+                                                           float[][] qfaces,
+                                                           int topK) {
         Map<String, Float> best = new HashMap<>();
-        HnswImageIndex idx = new HnswImageIndex(ctx, "face_hnsw.index");
+        HnswImageIndex idx = getFaceHnsw(ctx);
         boolean usedHnsw = false;
         if (idx.loadIfExists()) {
             usedHnsw = true;
@@ -336,7 +351,29 @@ public final class ImageSearchEngine {
                 }
             }
         }
-        return best;
+        return new FaceCandidatesResult(best, usedHnsw);
+    }
+
+    private static HnswImageIndex getDinoHnsw(Context context) {
+        if (dinoHnsw == null) {
+            synchronized (ImageSearchEngine.class) {
+                if (dinoHnsw == null) {
+                    dinoHnsw = new HnswImageIndex(context.getApplicationContext(), "dino_hnsw.index");
+                }
+            }
+        }
+        return dinoHnsw;
+    }
+
+    private static HnswImageIndex getFaceHnsw(Context context) {
+        if (faceHnsw == null) {
+            synchronized (ImageSearchEngine.class) {
+                if (faceHnsw == null) {
+                    faceHnsw = new HnswImageIndex(context.getApplicationContext(), "face_hnsw.index");
+                }
+            }
+        }
+        return faceHnsw;
     }
 
     private static String parseMediaKey(String id) {
@@ -347,13 +384,42 @@ public final class ImageSearchEngine {
         return id;
     }
 
-    private static void logFaceRerank(String session, long startMs, int faceCount, int candidates, boolean ran) {
+    private static void logFaceRerank(String session,
+                                      long startMs,
+                                      int faceCount,
+                                      int candidates,
+                                      boolean ran,
+                                      @Nullable Boolean usedHnsw) {
         double dur = SystemClock.elapsedRealtime() - startMs;
         HashMap<String, Object> extra = new HashMap<>();
         extra.put("query_faces", faceCount);
         extra.put("candidates", candidates);
         extra.put("ran", ran);
+        if (usedHnsw != null) {
+            extra.put("used_hnsw", usedHnsw);
+            extra.put("index_available", usedHnsw);
+        }
         PerfLogger.log("image_search_face_rerank", dur, session, extra);
+    }
+
+    private static final class QueryEmbeddingResult {
+        final float[] embedding;
+        final boolean cacheHit;
+
+        QueryEmbeddingResult(float[] embedding, boolean cacheHit) {
+            this.embedding = embedding;
+            this.cacheHit = cacheHit;
+        }
+    }
+
+    private static final class FaceCandidatesResult {
+        final Map<String, Float> scores;
+        final boolean usedHnsw;
+
+        FaceCandidatesResult(Map<String, Float> scores, boolean usedHnsw) {
+            this.scores = scores == null ? Collections.emptyMap() : scores;
+            this.usedHnsw = usedHnsw;
+        }
     }
 
     private static final class SearchWithIndexResult {

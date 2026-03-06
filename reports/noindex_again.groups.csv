@@ -1,0 +1,5 @@
+event,group_key,group_value,count,mean_ms,p50_ms,p90_ms,p95_ms,p99_ms,max_ms
+text_search_ann,index_available,false,16,17.94,16.00,26.00,29.25,29.85,30.00
+text_search_ann,used_hnsw,false,16,17.94,16.00,26.00,29.25,29.85,30.00
+text_search_total,index_available,false,16,229.81,221.50,300.00,327.25,361.45,370.00
+text_search_total,used_hnsw,false,16,229.81,221.50,300.00,327.25,361.45,370.00

@@ -1,0 +1,67 @@
+gt_file=gt\classification_gt_500.csv
+log_file=reports\cls_eval.log
+rows_file=reports\classification_eval_rows.csv
+
+total=500
+missing_in_log=2
+overall_correct=354
+overall_accuracy=0.7080
+known_total(exclude_UNKNOWN_gt)=423
+known_correct=292
+known_accuracy=0.6903
+known_coverage(pred_not_UNKNOWN_or_MISSING)=0.7376
+
+gt_distribution:
+  DRAWING: 150
+  ARCHITECTURE: 77
+  UNKNOWN: 77
+  TEXT: 60
+  FOOD: 28
+  NATURE: 24
+  ELECTRONICS: 19
+  SELFIE: 18
+  CARD: 12
+  PLANTS: 10
+  VEHICLES: 9
+  GROUP: 8
+  PETS: 7
+  QRCODE: 1
+
+pred_distribution:
+  UNKNOWN: 171
+  DRAWING: 105
+  ARCHITECTURE: 75
+  TEXT: 47
+  FOOD: 28
+  VEHICLES: 17
+  NATURE: 11
+  ELECTRONICS: 9
+  GROUP: 9
+  CARD: 8
+  SELFIE: 7
+  PETS: 6
+  PLANTS: 4
+  MISSING: 2
+  QRCODE: 1
+
+top_mismatches(gt->pred):
+  DRAWING -> UNKNOWN: 47
+  TEXT -> UNKNOWN: 15
+  NATURE -> UNKNOWN: 13
+  ELECTRONICS -> UNKNOWN: 9
+  SELFIE -> UNKNOWN: 6
+  ARCHITECTURE -> UNKNOWN: 6
+  ARCHITECTURE -> VEHICLES: 4
+  PLANTS -> NATURE: 4
+  UNKNOWN -> VEHICLES: 4
+  CARD -> UNKNOWN: 4
+  FOOD -> UNKNOWN: 3
+  SELFIE -> ARCHITECTURE: 3
+  UNKNOWN -> TEXT: 3
+  NATURE -> ARCHITECTURE: 3
+  SELFIE -> GROUP: 2
+  PLANTS -> UNKNOWN: 2
+  PETS -> UNKNOWN: 2
+  UNKNOWN -> ARCHITECTURE: 2
+  UNKNOWN -> FOOD: 2
+  UNKNOWN -> DRAWING: 2

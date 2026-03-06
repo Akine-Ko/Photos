@@ -1,27 +1,16 @@
 #!/usr/bin/env python3
 """
-收集设备 logcat 中 PerfMetric 日志，计算统计数据并输出为 CSV，便于用 Excel 查看。
+Collect PerfMetric JSON events from adb logcat and export CSV reports.
 
-使用约定：
-- App 在测试按钮点击或关键步骤处输出：Log.i("PerfMetric", "{...json...}")
-  JSON 至少包含：
-    event: 事件名，如 "clip_encode" / "dino_encode" / "face_encode" / "text_search" 等
-    dur_ms: 单次耗时（毫秒）
-  可选：
-    session: 本次测量的会话标识（便于过滤同一轮测试）
-    extra 字段随意
+Default outputs:
+1) Summary by event latency: --output (default perf_metrics.csv)
+2) Raw samples: <output>.raw.csv
+3) Grouped latency by selected keys: <output>.groups.csv
 
-示例日志：
-  Log.i("PerfMetric", "{\"event\":\"clip_encode\",\"dur_ms\":42,\"session\":\"run1\"}");
-
-运行脚本：
-  python tools/perf_capture.py --session run1 --output perf_run1.csv
-
-参数：
-  --session   仅统计指定 session 的日志（可选，不传则不过滤）
-  --device    指定设备序列号（adb -s，默认为空）
-  --timeout   自动停止采集的秒数（可选，不传则需 Ctrl+C 结束）
-  --output    输出 CSV 路径（默认 perf_metrics.csv）
+Grouped report is useful for comparisons such as:
+- used_hnsw=true vs false
+- query_cache_hit=true vs false
+- index_available=true vs false
 """
 
 import argparse
@@ -33,19 +22,34 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-import contextlib
+from typing import Any, Dict, Iterable, List, Tuple
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Parse PerfMetric logcat to CSV")
-    p.add_argument("--session", help="filter by session field in JSON", default=None)
-    p.add_argument("--device", help="adb device id", default=None)
-    p.add_argument("--timeout", type=int, help="stop after N seconds", default=None)
-    p.add_argument("--output", help="output CSV path", default="perf_metrics.csv")
+    p = argparse.ArgumentParser(description="Parse PerfMetric logcat and export CSV reports.")
+    p.add_argument("--session", help="Filter by session field in JSON.", default=None)
+    p.add_argument("--device", help="adb device id.", default=None)
+    p.add_argument("--timeout", type=int, help="Stop after N seconds.", default=None)
+    p.add_argument("--output", help="Summary CSV path.", default="perf_metrics.csv")
+    p.add_argument(
+        "--raw-output",
+        help="Raw sample CSV path. Default: <output>.raw.csv",
+        default=None,
+    )
+    p.add_argument(
+        "--group-output",
+        help="Grouped CSV path. Default: <output>.groups.csv",
+        default=None,
+    )
+    p.add_argument(
+        "--group-keys",
+        help="Comma-separated JSON keys for grouped stats.",
+        default="used_hnsw,index_available,query_cache_hit,cache_hit,ran",
+    )
     return p.parse_args()
 
 
-def percentile(sorted_vals, p):
+def percentile(sorted_vals: List[float], p: float):
     if not sorted_vals:
         return None
     if len(sorted_vals) == 1:
@@ -60,17 +64,27 @@ def percentile(sorted_vals, p):
     return float(d0 + d1)
 
 
-def parse_line(line):
-    """尝试从 logcat 行中提取 JSON，并返回 dict；失败则返回 None"""
+def parse_line(line: str):
     line = line.strip()
     pos = line.find("{")
     if pos == -1:
         return None
     snippet = line[pos:]
     try:
-        return json.loads(snippet)
+        data = json.loads(snippet)
     except json.JSONDecodeError:
         return None
+    return data if isinstance(data, dict) else None
+
+
+def scalar_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float, str)):
+        return str(value)
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
 def collect(args):
@@ -79,9 +93,16 @@ def collect(args):
         cmd += ["-s", args.device]
     cmd += ["logcat", "-v", "time", "PerfMetric:D", "*:S"]
     print("Running:", " ".join(cmd))
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
 
-    buckets = defaultdict(list)
+    buckets: Dict[str, List[float]] = defaultdict(list)
+    samples: List[Dict[str, Any]] = []
     start = time.time()
     try:
         for line in proc.stdout:
@@ -100,9 +121,16 @@ def collect(args):
                 dur = float(dur)
             except Exception:
                 continue
-            buckets[event].append(dur)
-            # 简短进度提示
-            sys.stdout.write(f"\rCaptured {sum(len(v) for v in buckets.values())} samples...")
+
+            sample = {"event": str(event), "dur_ms": dur}
+            for k, v in data.items():
+                if k in ("event", "dur_ms"):
+                    continue
+                sample[str(k)] = v
+            samples.append(sample)
+            buckets[str(event)].append(dur)
+
+            sys.stdout.write(f"\rCaptured {len(samples)} samples...")
             sys.stdout.flush()
             if args.timeout and (time.time() - start) >= args.timeout:
                 break
@@ -121,12 +149,11 @@ def collect(args):
             except BaseException:
                 pass
     print()
-    return buckets
+    return buckets, samples
 
 
-def write_csv(buckets, output_path):
+def write_summary_csv(buckets: Dict[str, List[float]], output_path: Path):
     fields = ["event", "count", "mean_ms", "p50_ms", "p90_ms", "p95_ms", "p99_ms", "max_ms"]
-    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -150,18 +177,112 @@ def write_csv(buckets, output_path):
     return output_path
 
 
+def write_raw_csv(samples: List[Dict[str, Any]], output_path: Path):
+    extra_keys = set()
+    for s in samples:
+        for k in s.keys():
+            if k in ("event", "dur_ms"):
+                continue
+            extra_keys.add(k)
+    fields = ["event", "dur_ms"] + sorted(extra_keys)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(fields)
+        for s in samples:
+            row = [s.get("event", ""), s.get("dur_ms", "")]
+            for key in fields[2:]:
+                row.append(scalar_cell(s.get(key)))
+            writer.writerow(row)
+    return output_path
+
+
+def build_group_rows(samples: List[Dict[str, Any]], group_keys: Iterable[str]):
+    grouped: Dict[Tuple[str, str, str], List[float]] = defaultdict(list)
+    clean_group_keys = [k for k in group_keys if k]
+    for s in samples:
+        event = str(s.get("event", ""))
+        dur = s.get("dur_ms")
+        if event == "" or not isinstance(dur, (int, float)):
+            continue
+        for key in clean_group_keys:
+            if key not in s:
+                continue
+            value = s[key]
+            if isinstance(value, (dict, list, tuple, set)):
+                continue
+            group_value = scalar_cell(value)
+            grouped[(event, key, group_value)].append(float(dur))
+    rows = []
+    for (event, key, value), vals in sorted(grouped.items()):
+        if not vals:
+            continue
+        vals_sorted = sorted(vals)
+        mean = sum(vals_sorted) / len(vals_sorted)
+        rows.append(
+            [
+                event,
+                key,
+                value,
+                len(vals_sorted),
+                f"{mean:.2f}",
+                f"{percentile(vals_sorted, 50):.2f}",
+                f"{percentile(vals_sorted, 90):.2f}",
+                f"{percentile(vals_sorted, 95):.2f}",
+                f"{percentile(vals_sorted, 99):.2f}",
+                f"{max(vals_sorted):.2f}",
+            ]
+        )
+    return rows
+
+
+def write_group_csv(samples: List[Dict[str, Any]], group_keys: List[str], output_path: Path):
+    fields = [
+        "event",
+        "group_key",
+        "group_value",
+        "count",
+        "mean_ms",
+        "p50_ms",
+        "p90_ms",
+        "p95_ms",
+        "p99_ms",
+        "max_ms",
+    ]
+    rows = build_group_rows(samples, group_keys)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(fields)
+        writer.writerows(rows)
+    return output_path
+
+
+def with_suffix(path: Path, suffix: str):
+    ext = path.suffix if path.suffix else ".csv"
+    return path.with_name(path.stem + suffix + ext)
+
+
 def main():
     args = parse_args()
+    summary_out = Path(args.output)
+    raw_out = Path(args.raw_output) if args.raw_output else with_suffix(summary_out, ".raw")
+    group_out = Path(args.group_output) if args.group_output else with_suffix(summary_out, ".groups")
+    group_keys = [k.strip() for k in args.group_keys.split(",") if k.strip()]
     try:
-        buckets = collect(args)
+        buckets, samples = collect(args)
     except KeyboardInterrupt:
         print("\nInterrupted before collecting data; exiting.")
         sys.exit(1)
     if not buckets:
-        print("No samples captured. Confirm app is logging with tag PerfMetric and JSON payload.")
+        print("No samples captured. Confirm app logs PerfMetric JSON payloads.")
         sys.exit(1)
-    out = write_csv(buckets, args.output)
-    print(f"Wrote metrics to {out.resolve()}")
+    summary_path = write_summary_csv(buckets, summary_out)
+    raw_path = write_raw_csv(samples, raw_out)
+    group_path = write_group_csv(samples, group_keys, group_out)
+    print(f"Wrote summary to {summary_path.resolve()}")
+    print(f"Wrote raw samples to {raw_path.resolve()}")
+    print(f"Wrote grouped stats to {group_path.resolve()}")
 
 
 if __name__ == "__main__":
