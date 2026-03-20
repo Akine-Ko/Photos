@@ -1,0 +1,4 @@
+query_id,query_key,intent,must_hit_keys,relevant_strong_keys,relevant_weak_keys,notes
+q001,content://media/external/images/media/1000009120,FACE,content://media/external/images/media/1000009169,content://media/external/images/media/1000009169;content://media/external/images/media/1000009170,content://media/external/images/media/1000009127,same person retrieval
+q002,content://media/external/images/media/1000009819,SCENE,,content://media/external/images/media/1000009820;content://media/external/images/media/1000009516,content://media/external/images/media/1000009517;content://media/external/images/media/1000009518,similar scenery retrieval
+q003,content://media/external/images/media/1000009513,COMPOSITION,,content://media/external/images/media/1000009514;content://media/external/images/media/1000009515,content://media/external/images/media/1000009202,similar composition retrieval

@@ -1,0 +1,164 @@
+﻿--------- beginning of main
+03-07 10:07:26.669 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849246667","cache_hit":true}
+03-07 10:07:26.762 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:07:26.762 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":93,"session":"img-1772849246667","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:07:27.285 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":523,"session":"img-1772849246667","candidates":35,"index_available":true,"query_faces":1,"ran":true,"used_hnsw":true}
+03-07 10:07:27.286 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009730 score=0.85
+03-07 10:07:27.287 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009726 score=0.58622175
+03-07 10:07:27.287 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009757 score=0.5170368
+03-07 10:07:27.287 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009603 score=0.5130201
+03-07 10:07:27.288 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009602 score=0.11251334
+03-07 10:07:27.288 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009574 score=0.106893934
+03-07 10:07:27.288 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009755 score=0.09975989
+03-07 10:07:27.289 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009433 score=0.09795692
+03-07 10:07:27.289 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":621,"session":"img-1772849246667","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:07:50.605 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":5,"session":"img-1772849270600","cache_hit":true}
+03-07 10:07:50.610 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:07:50.611 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":6,"session":"img-1772849270600","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:07:50.883 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":272,"session":"img-1772849270600","candidates":32,"index_available":true,"query_faces":1,"ran":true,"used_hnsw":true}
+03-07 10:07:50.884 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009121 score=0.85
+03-07 10:07:50.884 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009124 score=0.70577615
+03-07 10:07:50.884 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009118 score=0.69214404
+03-07 10:07:50.885 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009119 score=0.6069753
+03-07 10:07:50.885 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009120 score=0.59984183
+03-07 10:07:50.885 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009132 score=0.5926125
+03-07 10:07:50.886 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009122 score=0.5681746
+03-07 10:07:50.886 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009169 score=0.5215134
+03-07 10:07:50.887 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":287,"session":"img-1772849270600","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:08:26.125 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849306124","cache_hit":true}
+03-07 10:08:26.130 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:08:26.130 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":5,"session":"img-1772849306124","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:08:26.426 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":296,"session":"img-1772849306124","candidates":30,"index_available":true,"query_faces":1,"ran":true,"used_hnsw":true}
+03-07 10:08:26.427 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1984 score=0.85
+03-07 10:08:26.427 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009131 score=0.6159707
+03-07 10:08:26.428 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009170 score=0.5930081
+03-07 10:08:26.428 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009125 score=0.5420418
+03-07 10:08:26.428 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009132 score=0.10633706
+03-07 10:08:26.429 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009561 score=0.10232258
+03-07 10:08:26.429 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009129 score=0.0
+03-07 10:08:26.429 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009729 score=0.0
+03-07 10:08:26.429 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":305,"session":"img-1772849306124","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:08:52.972 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849332971","cache_hit":true}
+03-07 10:08:52.976 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:08:52.976 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":4,"session":"img-1772849332971","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:08:53.299 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:08:53.300 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":324,"session":"img-1772849332971","candidates":0,"query_faces":0,"ran":false}
+03-07 10:08:53.301 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009467 score=-0.0
+03-07 10:08:53.301 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009465 score=-0.19961
+03-07 10:08:53.301 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009464 score=-0.22839749
+03-07 10:08:53.302 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009199 score=-0.4280305
+03-07 10:08:53.302 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009216 score=-0.4722427
+03-07 10:08:53.303 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009468 score=-0.4908617
+03-07 10:08:53.303 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009476 score=-0.50463223
+03-07 10:08:53.304 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009474 score=-0.5249966
+03-07 10:08:53.304 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":333,"session":"img-1772849332971","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:10.265 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849350264","cache_hit":true}
+03-07 10:09:10.272 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:09:10.272 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":7,"session":"img-1772849350264","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:10.540 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:09:10.540 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":268,"session":"img-1772849350264","candidates":0,"query_faces":0,"ran":false}
+03-07 10:09:10.542 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009565 score=-0.0
+03-07 10:09:10.543 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009564 score=-0.30149114
+03-07 10:09:10.543 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009563 score=-0.33831668
+03-07 10:09:10.543 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009566 score=-0.3816663
+03-07 10:09:10.544 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009581 score=-0.4281596
+03-07 10:09:10.544 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009632 score=-0.43000144
+03-07 10:09:10.544 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009578 score=-0.44245845
+03-07 10:09:10.545 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009754 score=-0.46466053
+03-07 10:09:10.545 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":281,"session":"img-1772849350264","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:37.165 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849377163","cache_hit":true}
+03-07 10:09:37.173 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:09:37.173 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":8,"session":"img-1772849377163","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:37.507 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:09:37.507 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":333,"session":"img-1772849377163","candidates":0,"query_faces":0,"ran":false}
+03-07 10:09:37.508 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009530 score=-0.0
+03-07 10:09:37.509 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009483 score=-0.31648612
+03-07 10:09:37.509 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009526 score=-0.31648612
+03-07 10:09:37.509 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009211 score=-0.3860306
+03-07 10:09:37.510 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009529 score=-0.3860306
+03-07 10:09:37.510 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009479 score=-0.5625889
+03-07 10:09:37.510 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009209 score=-0.5625889
+03-07 10:09:37.511 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009478 score=-0.59787256
+03-07 10:09:37.511 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":348,"session":"img-1772849377163","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:49.284 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849389283","cache_hit":true}
+03-07 10:09:49.290 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:09:49.290 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":6,"session":"img-1772849389283","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:09:49.456 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:09:49.456 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":165,"session":"img-1772849389283","candidates":0,"query_faces":0,"ran":false}
+03-07 10:09:49.457 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009623 score=-0.0
+03-07 10:09:49.457 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009622 score=-0.16391039
+03-07 10:09:49.458 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009620 score=-0.2129988
+03-07 10:09:49.458 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009621 score=-0.22638232
+03-07 10:09:49.459 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009617 score=-0.2689348
+03-07 10:09:49.459 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009619 score=-0.38205475
+03-07 10:09:49.459 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009633 score=-0.5611384
+03-07 10:09:49.460 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009627 score=-0.5713999
+03-07 10:09:49.460 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":177,"session":"img-1772849389283","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:10:30.511 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1101,"session":"img-1772849429410","cache_hit":false}
+03-07 10:10:30.516 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:10:30.517 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":6,"session":"img-1772849429410","limit":8,"index_available":true,"query_cache_hit":false,"results":8,"used_hnsw":true}
+03-07 10:10:30.818 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:10:30.818 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":301,"session":"img-1772849429410","candidates":0,"query_faces":0,"ran":false}
+03-07 10:10:30.819 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009190 score=-0.0
+03-07 10:10:30.820 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009188 score=-0.114209294
+03-07 10:10:30.820 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009194 score=-0.60440797
+03-07 10:10:30.820 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009195 score=-0.6147241
+03-07 10:10:30.821 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009212 score=-0.67731774
+03-07 10:10:30.821 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009489 score=-0.69585246
+03-07 10:10:30.821 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009201 score=-0.711318
+03-07 10:10:30.822 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009487 score=-0.72332215
+03-07 10:10:30.822 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":1412,"session":"img-1772849429410","limit":8,"index_available":true,"query_cache_hit":false,"results":8,"used_hnsw":true}
+03-07 10:10:49.887 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":0,"session":"img-1772849449887","cache_hit":true}
+03-07 10:10:49.891 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:10:49.891 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":4,"session":"img-1772849449887","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:10:50.139 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:10:50.139 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":248,"session":"img-1772849449887","candidates":0,"query_faces":0,"ran":false}
+03-07 10:10:50.140 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009575 score=-0.0
+03-07 10:10:50.140 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009215 score=-0.47915494
+03-07 10:10:50.141 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009571 score=-0.48135537
+03-07 10:10:50.141 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009606 score=-0.4994288
+03-07 10:10:50.141 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009808 score=-0.53472316
+03-07 10:10:50.142 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009435 score=-0.5480174
+03-07 10:10:50.142 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009665 score=-0.56752884
+03-07 10:10:50.143 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009566 score=-0.57782924
+03-07 10:10:50.143 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":256,"session":"img-1772849449887","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:02.895 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":0,"session":"img-1772849462894","cache_hit":true}
+03-07 10:11:02.899 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:11:02.899 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":4,"session":"img-1772849462894","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:03.200 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":300,"session":"img-1772849462894","candidates":62,"index_available":true,"query_faces":3,"ran":true,"used_hnsw":true}
+03-07 10:11:03.201 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009711 score=0.85
+03-07 10:11:03.202 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009706 score=0.1043764
+03-07 10:11:03.202 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009703 score=0.10344005
+03-07 10:11:03.203 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009780 score=0.10114046
+03-07 10:11:03.203 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009705 score=0.09958494
+03-07 10:11:03.203 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009712 score=0.096913986
+03-07 10:11:03.204 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009628 score=0.09272814
+03-07 10:11:03.204 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009545 score=0.092276655
+03-07 10:11:03.204 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":309,"session":"img-1772849462894","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:15.513 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849475512","cache_hit":true}
+03-07 10:11:15.515 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:11:15.515 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":2,"session":"img-1772849475512","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:15.750 I/ImageSearchEngine( 9553): face rerank: query face embedding null
+03-07 10:11:15.750 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":235,"session":"img-1772849475512","candidates":0,"query_faces":0,"ran":false}
+03-07 10:11:15.751 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009742 score=-0.0
+03-07 10:11:15.752 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009602 score=-0.14722574
+03-07 10:11:15.752 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009789 score=-0.14916718
+03-07 10:11:15.753 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009739 score=-0.1585384
+03-07 10:11:15.753 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009806 score=-0.19003212
+03-07 10:11:15.753 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009586 score=-0.19585669
+03-07 10:11:15.754 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009642 score=-0.19772464
+03-07 10:11:15.754 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009668 score=-0.20352364
+03-07 10:11:15.754 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":242,"session":"img-1772849475512","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:34.164 I/PerfMetric( 9553): {"event":"image_query_embedding","dur_ms":1,"session":"img-1772849494163","cache_hit":true}
+03-07 10:11:34.170 I/ImageSearchEngine( 9553): HNSW search used, got=8
+03-07 10:11:34.171 I/PerfMetric( 9553): {"event":"image_search_ann","dur_ms":7,"session":"img-1772849494163","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}
+03-07 10:11:34.586 I/PerfMetric( 9553): {"event":"image_search_face_rerank","dur_ms":415,"session":"img-1772849494163","candidates":50,"index_available":true,"query_faces":2,"ran":true,"used_hnsw":true}
+03-07 10:11:34.587 I/ImageSearchEngine( 9553): top[0] content://media/external/images/media/1000009666 score=0.85
+03-07 10:11:34.587 I/ImageSearchEngine( 9553): top[1] content://media/external/images/media/1000009796 score=0.5424065
+03-07 10:11:34.588 I/ImageSearchEngine( 9553): top[2] content://media/external/images/media/1000009441 score=0.5415746
+03-07 10:11:34.588 I/ImageSearchEngine( 9553): top[3] content://media/external/images/media/1000009596 score=0.5328483
+03-07 10:11:34.588 I/ImageSearchEngine( 9553): top[4] content://media/external/images/media/1000009819 score=0.5105383
+03-07 10:11:34.589 I/ImageSearchEngine( 9553): top[5] content://media/external/images/media/1000009229 score=0.11915159
+03-07 10:11:34.589 I/ImageSearchEngine( 9553): top[6] content://media/external/images/media/1000009574 score=0.11513241
+03-07 10:11:34.589 I/ImageSearchEngine( 9553): top[7] content://media/external/images/media/1000009652 score=0.11507964
+03-07 10:11:34.589 I/PerfMetric( 9553): {"event":"image_search_total","dur_ms":426,"session":"img-1772849494163","limit":8,"index_available":true,"query_cache_hit":true,"results":8,"used_hnsw":true}

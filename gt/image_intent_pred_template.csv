@@ -1,0 +1,4 @@
+query_id,topk_keys
+q001,content://media/external/images/media/1000009169;content://media/external/images/media/1000009135;content://media/external/images/media/1000009170
+q002,content://media/external/images/media/1000009820;content://media/external/images/media/1000009518;content://media/external/images/media/1000009400
+q003,content://media/external/images/media/1000009514;content://media/external/images/media/1000009515;content://media/external/images/media/1000009202

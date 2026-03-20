@@ -22,6 +22,7 @@ import com.example.photos.util.PerfLogger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -103,13 +104,30 @@ public final class ImageSearchEngine {
 
         List<SearchResult> out = new ArrayList<>();
         PhotoDao photoDao = db.photoDao();
+        Set<String> seenCanonicalKeys = new HashSet<>();
+        String queryCanonicalKey = canonicalIdentityKey(queryAsset.contentUri);
+        boolean queryAdded = false;
         for (int i = 0; i < ordered.size(); i++) {
             SearchResultInternal internal = ordered.get(i);
             Photo photo = mapToPhoto(photoDao, internal.mediaKey);
             if (photo != null) {
+                String internalCanonicalKey = canonicalIdentityKey(internal.mediaKey);
+                // Deduplicate same photo even if URI forms differ (media URI vs document URI).
+                if (!seenCanonicalKeys.add(internalCanonicalKey)) {
+                    continue;
+                }
+                // Keep at most one self result for query image.
+                if (queryCanonicalKey.equals(internalCanonicalKey)) {
+                    if (queryAdded) {
+                        continue;
+                    }
+                    queryAdded = true;
+                }
                 out.add(new SearchResult(photo, internal.score));
-                if (i < 3) {
-                    android.util.Log.i(TAG, "top[" + i + "] " + internal.mediaKey + " score=" + internal.score);
+                int rank = out.size() - 1;
+                android.util.Log.i(TAG, "top[" + rank + "] " + internal.mediaKey + " score=" + internal.score);
+                if (out.size() >= topK) {
+                    break;
                 }
             }
         }
@@ -382,6 +400,54 @@ public final class ImageSearchEngine {
             return id.substring(0, pos);
         }
         return id;
+    }
+
+    private static String canonicalIdentityKey(String rawKey) {
+        String key = parseMediaKey(rawKey == null ? "" : rawKey);
+        if (key.isEmpty()) {
+            return key;
+        }
+        try {
+            Uri uri = Uri.parse(key);
+            String last = uri.getLastPathSegment();
+            if (last != null && !last.isEmpty()) {
+                String decoded = Uri.decode(last);
+                int colon = decoded.lastIndexOf(':');
+                if (colon >= 0 && colon + 1 < decoded.length()) {
+                    String tail = decoded.substring(colon + 1);
+                    if (isDigits(tail)) {
+                        return tail;
+                    }
+                }
+                if (isDigits(decoded)) {
+                    return decoded;
+                }
+            }
+            String whole = Uri.decode(key);
+            int colon = whole.lastIndexOf(':');
+            if (colon >= 0 && colon + 1 < whole.length()) {
+                String tail = whole.substring(colon + 1);
+                if (isDigits(tail)) {
+                    return tail;
+                }
+            }
+        } catch (Throwable ignore) {
+            // fallback below
+        }
+        return key;
+    }
+
+    private static boolean isDigits(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void logFaceRerank(String session,

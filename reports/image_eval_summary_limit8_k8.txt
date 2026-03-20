@@ -1,0 +1,12 @@
+gt_file=gt\image_eval_gt_simple.csv
+pred_file=gt\image_eval_pred_limit8.csv
+rows_file=reports\image_eval_rows_limit8_k8.csv
+queries=12
+k=8
+missing_pred_queries=0
+
+Hit@1=0.0000
+Precision@8=0.3333
+Recall@8=0.8075
+mAP@8=0.4357
+nDCG@8=0.5573

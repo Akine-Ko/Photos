@@ -1,0 +1,36 @@
+gt_file=gt\image_intent_gt_template.csv
+pred_file=gt\image_intent_pred_template.csv
+rows_file=reports\image_intent_eval_rows_demo.csv
+queries=3
+k=3
+
+[overall]
+Hit@1(must)=0.3333
+MRR@3(must)=0.3333
+Recall@3(strong)=0.8333
+Recall@3(all)=0.7222
+Precision@3(all)=0.7778
+nDCG@3(all)=0.8323
+
+[per_intent]
+COMPOSITION: n=1
+  Hit@1(must)=0.0000
+  MRR@3(must)=0.0000
+  Recall@3(strong)=1.0000
+  Recall@3(all)=1.0000
+  Precision@3(all)=1.0000
+  nDCG@3(all)=1.0000
+FACE: n=1
+  Hit@1(must)=1.0000
+  MRR@3(must)=1.0000
+  Recall@3(strong)=1.0000
+  Recall@3(all)=0.6667
+  Precision@3(all)=0.6667
+  nDCG@3(all)=0.7975
+SCENE: n=1
+  Hit@1(must)=0.0000
+  MRR@3(must)=0.0000
+  Recall@3(strong)=0.5000
+  Recall@3(all)=0.5000
+  Precision@3(all)=0.6667
+  nDCG@3(all)=0.6994

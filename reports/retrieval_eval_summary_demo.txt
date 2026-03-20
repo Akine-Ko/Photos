@@ -1,0 +1,12 @@
+gt_file=gt\image_manual_gt_template.csv
+pred_file=gt\image_manual_pred_template.csv
+rows_file=reports\retrieval_eval_rows_demo.csv
+queries=2
+k=3
+missing_pred_queries=0
+
+Hit@1=1.0000
+Precision@3=0.5000
+Recall@3=1.0000
+mAP@3=0.9167
+nDCG@3=0.9599

@@ -1,0 +1,3 @@
+query_id,query_key,relevant_keys
+q1,content://media/external/images/media/1000009120,content://media/external/images/media/1000009169;content://media/external/images/media/1000009170
+q2,content://media/external/images/media/1000009819,content://media/external/images/media/1000009820
